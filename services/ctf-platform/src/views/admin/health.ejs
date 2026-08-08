@@ -1,0 +1,18 @@
+<%- include('../partials/header', { title }) %>
+
+<a href="/admin" class="muted">&larr; Admin</a>
+<h1 class="mt-0">Service Health</h1>
+
+<div class="grid-2">
+  <div class="card">
+    <h2 class="mt-0">ctf-platform</h2>
+    <p>Database: <span class="badge-pill <%= dbHealth === 'ok' ? 'solved' : 'disabled' %>"><%= dbHealth %></span></p>
+  </div>
+  <div class="card">
+    <h2 class="mt-0">instant-web (company)</h2>
+    <p>Status: <span class="badge-pill <%= companyHealth.status === 'ok' ? 'solved' : 'disabled' %>"><%= companyHealth.status %></span></p>
+    <pre class="muted" style="white-space:pre-wrap;font-size:0.8rem"><%= JSON.stringify(companyHealth, null, 2) %></pre>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

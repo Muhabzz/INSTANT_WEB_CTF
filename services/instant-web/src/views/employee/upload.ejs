@@ -1,0 +1,17 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Upload Document</h1>
+<div class="card" style="max-width:480px">
+  <% if (error) { %><div class="alert error"><%= error %></div><% } %>
+  <p class="muted">Phase 1 note: this records document metadata only; binary file storage is not yet implemented.</p>
+  <form class="stacked" method="POST" action="/company/employee/upload">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label for="filename">Filename</label>
+    <input id="filename" name="filename" required placeholder="e.g. runbook.txt">
+    <label for="description">Description</label>
+    <textarea id="description" name="description" rows="3"></textarea>
+    <button class="btn" type="submit">Save</button>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

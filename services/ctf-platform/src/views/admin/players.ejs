@@ -1,0 +1,25 @@
+<%- include('../partials/header', { title }) %>
+
+<a href="/admin" class="muted">&larr; Admin</a>
+<h1 class="mt-0">Players</h1>
+
+<div class="card">
+  <table>
+    <thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Role</th><th>Score</th><th>Solved</th><th>Joined</th></tr></thead>
+    <tbody>
+    <% players.forEach(p => { %>
+      <tr>
+        <td><%= p.id %></td>
+        <td><%= p.username %></td>
+        <td><%= p.email %></td>
+        <td><%= p.is_admin ? 'Admin' : 'Player' %></td>
+        <td><%= p.score %></td>
+        <td><%= p.solved %></td>
+        <td class="muted"><%= new Date(p.created_at).toLocaleDateString() %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/footer') %>

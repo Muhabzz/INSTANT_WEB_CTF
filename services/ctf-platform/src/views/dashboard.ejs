@@ -1,0 +1,52 @@
+<%- include('partials/header', { title }) %>
+
+<h1 class="mt-0">Welcome, <%= player.username %></h1>
+
+<div class="stats-row">
+  <div class="stat">
+    <div class="value"><%= solvedCount %> / <%= totalChallenges %></div>
+    <div class="label">Progress</div>
+  </div>
+  <div class="stat">
+    <div class="value"><%= score %></div>
+    <div class="label">Score</div>
+  </div>
+  <div class="stat">
+    <div class="value"><%= totalChallenges %></div>
+    <div class="label">Challenges</div>
+  </div>
+  <div class="stat">
+    <div class="value"><%= solvedCount %></div>
+    <div class="label">Solved</div>
+  </div>
+</div>
+
+<div class="grid-2" style="margin-top:20px">
+  <div class="card">
+    <h2 class="mt-0">Recent solves</h2>
+    <% if (recentSolves.length === 0) { %>
+      <p class="muted">No solves yet — head to <a href="/challenges">Challenges</a> to get started.</p>
+    <% } else { %>
+      <table>
+        <thead><tr><th>Challenge</th><th>Points</th><th>When</th></tr></thead>
+        <tbody>
+        <% recentSolves.forEach(s => { %>
+          <tr>
+            <td><a href="/challenges/<%= s.slug %>"><%= s.title %></a></td>
+            <td>+<%= s.points_awarded %></td>
+            <td class="muted"><%= new Date(s.solved_at).toLocaleString() %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+  <div class="card">
+    <h2 class="mt-0">Next steps</h2>
+    <p class="muted">Open the Instant company environment and start reconnaissance.</p>
+    <a class="btn" href="/company/" target="_blank" rel="noopener">Open Company &rarr;</a>
+    <p class="muted" style="margin-top:16px">Or jump straight to the <a href="/challenges">challenge list</a>.</p>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

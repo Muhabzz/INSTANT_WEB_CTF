@@ -1,0 +1,21 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<div class="card" style="max-width:420px;margin:0 auto">
+  <h1 class="mt-0">Create your account</h1>
+  <% if (error) { %><div class="alert error"><%= error %></div><% } %>
+  <form class="stacked" method="POST" action="/company/portal/register">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label for="name">Full name</label>
+    <input id="name" name="name" required value="<%= formValues.name || '' %>">
+    <label for="email">Email</label>
+    <input id="email" type="email" name="email" required value="<%= formValues.email || '' %>">
+    <label for="password">Password</label>
+    <input id="password" type="password" name="password" required minlength="8">
+    <label for="confirm_password">Confirm password</label>
+    <input id="confirm_password" type="password" name="confirm_password" required minlength="8">
+    <button class="btn" type="submit" style="width:100%">Register</button>
+  </form>
+  <p class="muted" style="margin-top:14px">Already have an account? <a href="/company/portal/login">Login</a></p>
+</div>
+
+<%- include('../partials/footer') %>

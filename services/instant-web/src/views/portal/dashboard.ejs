@@ -1,0 +1,17 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Welcome, <%= companyUser.name %></h1>
+
+<div class="grid-3">
+  <div class="card"><h2 class="mt-0"><%= orderCount %></h2><p class="muted">Total orders</p></div>
+  <div class="card"><h2 class="mt-0">$<%= (totalCents / 100).toFixed(2) %></h2><p class="muted">Lifetime spend</p></div>
+  <div class="card"><h2 class="mt-0"><%= openTickets %></h2><p class="muted">Open support tickets</p></div>
+</div>
+
+<div class="card">
+  <a href="/company/portal/orders">View orders</a> &middot;
+  <a href="/company/portal/invoices">View invoices</a> &middot;
+  <a href="/company/portal/support">Support</a>
+</div>
+
+<%- include('../partials/footer') %>

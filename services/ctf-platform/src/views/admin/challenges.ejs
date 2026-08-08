@@ -1,0 +1,31 @@
+<%- include('../partials/header', { title }) %>
+
+<a href="/admin" class="muted">&larr; Admin</a>
+<h1 class="mt-0">Challenges</h1>
+
+<div class="card">
+  <table>
+    <thead><tr><th>#</th><th>Slug</th><th>Title</th><th>Category</th><th>Difficulty</th><th>Points</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    <% challenges.forEach(c => { %>
+      <tr>
+        <td><%= c.order_index %></td>
+        <td class="muted"><%= c.slug %></td>
+        <td><%= c.title %></td>
+        <td class="muted"><%= c.category %></td>
+        <td class="difficulty-<%= c.difficulty %>"><%= c.difficulty %></td>
+        <td><%= c.points %></td>
+        <td><span class="badge-pill <%= c.enabled ? 'solved' : 'disabled' %>"><%= c.enabled ? 'Enabled' : 'Disabled' %></span></td>
+        <td>
+          <form method="POST" action="/admin/challenges/<%= c.id %>/toggle">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn secondary" type="submit"><%= c.enabled ? 'Disable' : 'Enable' %></button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/footer') %>

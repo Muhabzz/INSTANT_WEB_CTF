@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · Instant</title>
+  <link rel="stylesheet" href="/company/css/style.css">
+</head>
+<body>
+<header class="topnav">
+  <div class="container">
+    <a class="brand" href="/company/">Instant<span class="suffix"><%= brandSuffix || '' %></span></a>
+    <nav class="links">
+      <% (navItems || []).forEach(item => { %>
+        <a href="<%= item.href %>"><%= item.label %></a>
+      <% }) %>
+      <% if (typeof sessionUserLabel !== 'undefined' && sessionUserLabel) { %>
+        <span class="user-chip"><%= sessionUserLabel %></span>
+        <form method="POST" action="<%= logoutAction %>" style="display:inline">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn secondary" type="submit">Logout</button>
+        </form>
+      <% } %>
+    </nav>
+  </div>
+</header>
+<main class="container">

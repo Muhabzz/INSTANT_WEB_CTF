@@ -1,0 +1,38 @@
+<%- include('partials/header', { title }) %>
+
+<div class="card">
+  <h1 class="mt-0">Welcome to INSTANT WEB CTF</h1>
+  <p class="muted">
+    You've been hired to perform authorized security testing against <strong>Instant</strong>,
+    a fictional SaaS company. Register a CTF account, explore the Instant company
+    environment, and submit flags as you find them.
+  </p>
+  <% if (typeof player === 'undefined' || !player) { %>
+    <a class="btn" href="/register">Get Started</a>
+    <a class="btn secondary" href="/login">Login</a>
+  <% } else { %>
+    <a class="btn" href="/dashboard">Go to Dashboard</a>
+  <% } %>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2 class="mt-0">How it works</h2>
+    <ol class="muted">
+      <li>Register a player account on this platform.</li>
+      <li>Open the <strong>Company</strong> area to explore Instant's public site, customer portal, employee portal, and admin portal.</li>
+      <li>Find vulnerabilities, capture flags, and submit them under Challenges.</li>
+      <li>Track your progress on the Scoreboard.</li>
+    </ol>
+  </div>
+  <div class="card">
+    <h2 class="mt-0">Rules</h2>
+    <ul class="muted">
+      <li>All targets are synthetic and isolated. Do not attack anything outside this environment.</li>
+      <li>Flags follow the format <code>INSTANT{...}</code>.</li>
+      <li>Duplicate flag submissions do not award extra points.</li>
+    </ul>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

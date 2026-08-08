@@ -1,0 +1,15 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Files</h1>
+<div class="grid-3">
+  <% documents.forEach(d => { %>
+    <div class="product-card">
+      <div class="muted" style="font-size:0.8rem">FILE</div>
+      <h2 style="font-size:1rem"><%= d.filename %></h2>
+      <p class="muted" style="font-size:0.85rem"><%= d.description %></p>
+    </div>
+  <% }) %>
+  <% if (documents.length === 0) { %><p class="muted">No files yet.</p><% } %>
+</div>
+
+<%- include('../partials/footer') %>

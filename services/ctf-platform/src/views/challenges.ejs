@@ -1,0 +1,22 @@
+<%- include('partials/header', { title }) %>
+
+<h1 class="mt-0">Challenges</h1>
+
+<div class="card">
+  <table>
+    <thead><tr><th>Status</th><th>Title</th><th>Category</th><th>Difficulty</th><th>Points</th></tr></thead>
+    <tbody>
+    <% challenges.forEach(c => { %>
+      <tr>
+        <td><span class="badge-pill <%= c.solved ? 'solved' : 'open' %>"><%= c.solved ? 'Solved' : 'Open' %></span></td>
+        <td><a href="/challenges/<%= c.slug %>"><%= c.title %></a></td>
+        <td class="muted"><%= c.category %></td>
+        <td class="difficulty-<%= c.difficulty %>"><%= c.difficulty %></td>
+        <td><%= c.points %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/footer') %>

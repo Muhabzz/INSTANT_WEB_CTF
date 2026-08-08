@@ -1,0 +1,21 @@
+<%- include('partials/header', { title }) %>
+
+<h1 class="mt-0">Scoreboard</h1>
+
+<div class="card">
+  <table>
+    <thead><tr><th>Rank</th><th>Player</th><th>Score</th><th>Solved</th></tr></thead>
+    <tbody>
+    <% rows.forEach((r, i) => { %>
+      <tr>
+        <td>#<%= i + 1 %></td>
+        <td><%= r.username %></td>
+        <td><%= r.score %></td>
+        <td><%= r.solved %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/footer') %>

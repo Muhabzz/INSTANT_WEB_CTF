@@ -1,0 +1,21 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Invoices</h1>
+<div class="card">
+  <table>
+    <thead><tr><th>Invoice</th><th>Status</th><th>Amount</th><th>Issued</th></tr></thead>
+    <tbody>
+    <% invoices.forEach(i => { %>
+      <tr>
+        <td><%= i.invoice_number %></td>
+        <td><span class="pill <%= i.status %>"><%= i.status %></span></td>
+        <td>$<%= (i.amount_cents / 100).toFixed(2) %></td>
+        <td class="muted"><%= new Date(i.issued_at).toLocaleDateString() %></td>
+      </tr>
+    <% }) %>
+    <% if (invoices.length === 0) { %><tr><td colspan="4" class="muted">No invoices yet.</td></tr><% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/footer') %>

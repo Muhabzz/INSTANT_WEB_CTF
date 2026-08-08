@@ -1,0 +1,22 @@
+<%- include('../partials/header', { title }) %>
+
+<a href="/admin" class="muted">&larr; Admin</a>
+<h1 class="mt-0">Solves</h1>
+
+<div class="card">
+  <table>
+    <thead><tr><th>Player</th><th>Challenge</th><th>Points</th><th>When</th></tr></thead>
+    <tbody>
+    <% solves.forEach(s => { %>
+      <tr>
+        <td><%= s.username %></td>
+        <td><%= s.challenge_title %></td>
+        <td>+<%= s.points_awarded %></td>
+        <td class="muted"><%= new Date(s.solved_at).toLocaleString() %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/footer') %>

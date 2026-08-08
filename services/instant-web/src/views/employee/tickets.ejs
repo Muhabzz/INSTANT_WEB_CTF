@@ -1,0 +1,20 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Support Tickets</h1>
+<div class="card">
+  <table>
+    <thead><tr><th>Customer</th><th>Subject</th><th>Status</th><th>Opened</th></tr></thead>
+    <tbody>
+    <% tickets.forEach(t => { %>
+      <tr>
+        <td><%= t.customer_name %></td>
+        <td><%= t.subject %></td>
+        <td><span class="pill <%= t.status %>"><%= t.status %></span></td>
+        <td class="muted"><%= new Date(t.created_at).toLocaleDateString() %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/footer') %>

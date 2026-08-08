@@ -1,0 +1,186 @@
+name: instant-web-ctf
+
+networks:
+  public:
+    driver: bridge
+  app:
+    driver: bridge
+    internal: false
+  internal:
+    driver: bridge
+    internal: true
+  db:
+    driver: bridge
+    internal: true
+
+volumes:
+  postgres-data:
+
+x-hardening: &hardening
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  privileged: false
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    <<: *hardening
+    # The upstream entrypoint starts as root to chown the data directory and
+    # then drops to the `postgres` user - it needs these capabilities back
+    # (everything else from the hardening defaults stays dropped).
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    # No published ports: only reachable from the `db` network.
+
+  ctf-platform:
+    build: ./services/ctf-platform
+    <<: *hardening
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      PLATFORM_PORT: ${PLATFORM_PORT}
+      PLATFORM_SESSION_SECRET: ${PLATFORM_SESSION_SECRET}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
+      SEED_PLAYER_USERNAME: ${SEED_PLAYER_USERNAME}
+      SEED_PLAYER_EMAIL: ${SEED_PLAYER_EMAIL}
+      SEED_PLAYER_PASSWORD: ${SEED_PLAYER_PASSWORD}
+      COMPANY_HEALTH_URL: http://instant-web:${COMPANY_PORT}/health
+    networks:
+      - app
+      - db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # No published ports: only reachable from nginx, over the `app` network.
+
+  instant-web:
+    build: ./services/instant-web
+    <<: *hardening
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      COMPANY_PORT: ${COMPANY_PORT}
+      COMPANY_CUSTOMER_SESSION_SECRET: ${COMPANY_CUSTOMER_SESSION_SECRET}
+      COMPANY_EMPLOYEE_SESSION_SECRET: ${COMPANY_EMPLOYEE_SESSION_SECRET}
+      COMPANY_ADMIN_SESSION_SECRET: ${COMPANY_ADMIN_SESSION_SECRET}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SEED_CUSTOMER_EMAIL: ${SEED_CUSTOMER_EMAIL}
+      SEED_CUSTOMER_PASSWORD: ${SEED_CUSTOMER_PASSWORD}
+      SEED_EMPLOYEE_EMAIL: ${SEED_EMPLOYEE_EMAIL}
+      SEED_EMPLOYEE_PASSWORD: ${SEED_EMPLOYEE_PASSWORD}
+      SEED_COMPANY_ADMIN_EMAIL: ${SEED_COMPANY_ADMIN_EMAIL}
+      SEED_COMPANY_ADMIN_PASSWORD: ${SEED_COMPANY_ADMIN_PASSWORD}
+      INTERNAL_API_URL: ${INTERNAL_API_URL}
+      TEMPLATE_SERVICE_URL: ${TEMPLATE_SERVICE_URL}
+      INFRA_SERVICE_URL: ${INFRA_SERVICE_URL}
+    networks:
+      - app
+      - db
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # No published ports: only reachable from nginx (app network) and able
+    # to reach internal-api/template-service/infra-service (internal network).
+
+  internal-api:
+    build: ./services/internal-api
+    <<: *hardening
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      INTERNAL_API_PORT: ${INTERNAL_API_PORT}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    networks:
+      - internal
+      - db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # No published ports, not on the `app` network: unreachable from nginx
+    # or the public internet, only from instant-web over `internal`.
+
+  template-service:
+    build: ./services/template-service
+    <<: *hardening
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      TEMPLATE_SERVICE_PORT: ${TEMPLATE_SERVICE_PORT}
+    networks:
+      - internal
+    # No published ports, no DB access, internal network only.
+
+  infra-service:
+    build: ./services/infra-service
+    <<: *hardening
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      INFRA_SERVICE_PORT: ${INFRA_SERVICE_PORT}
+    networks:
+      - internal
+    # No published ports, no DB access, internal network only.
+
+  nginx:
+    image: nginx:1.27-alpine
+    <<: *hardening
+    # nginx's master process starts as root to bind ports 80/443, chown its
+    # cache/temp directories, and then fork worker processes that drop to an
+    # unprivileged user (setuid/setgid). With cap_drop: ALL from the
+    # hardening defaults, all of that needs capabilities added back
+    # explicitly - everything else stays dropped.
+    cap_add: [NET_BIND_SERVICE, CHOWN, SETGID, SETUID]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    networks:
+      - public
+      - app
+    depends_on:
+      ctf-platform:
+        condition: service_healthy
+      instant-web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/nginx-health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    # The ONLY service with published host ports (80/tcp, 443/tcp).

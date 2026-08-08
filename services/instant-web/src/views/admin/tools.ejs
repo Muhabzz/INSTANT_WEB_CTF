@@ -1,0 +1,16 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Internal Tools</h1>
+<p class="muted">Live status of internal services. These services are not reachable from the public internet — only from this admin portal, over the internal Docker network.</p>
+
+<div class="grid-3">
+  <% results.forEach(r => { %>
+    <div class="card">
+      <h2 class="mt-0"><%= r.name %></h2>
+      <p><span class="pill <%= r.status === 'ok' ? 'paid' : 'pending' %>"><%= r.status %></span></p>
+      <pre class="muted" style="white-space:pre-wrap;font-size:0.78rem"><%= JSON.stringify(r.detail, null, 2) %></pre>
+    </div>
+  <% }) %>
+</div>
+
+<%- include('../partials/footer') %>

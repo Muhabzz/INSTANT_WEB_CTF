@@ -1,0 +1,9 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Welcome, <%= companyUser.name %></h1>
+<div class="grid-2">
+  <div class="card"><h2 class="mt-0"><%= openTickets %></h2><p class="muted">Open support tickets (company-wide)</p></div>
+  <div class="card"><h2 class="mt-0"><%= docCount %></h2><p class="muted">Your documents</p></div>
+</div>
+
+<%- include('../partials/footer') %>

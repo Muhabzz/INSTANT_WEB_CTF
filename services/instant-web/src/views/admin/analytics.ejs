@@ -1,0 +1,31 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Analytics</h1>
+
+<div class="grid-2">
+  <div class="card">
+    <h2 class="mt-0">Users by role</h2>
+    <table>
+      <thead><tr><th>Role</th><th>Count</th></tr></thead>
+      <tbody>
+      <% byRole.forEach(r => { %><tr><td><%= r.role %></td><td><%= r.n %></td></tr><% }) %>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2 class="mt-0">Tickets by status</h2>
+    <table>
+      <thead><tr><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+      <% ticketsByStatus.forEach(t => { %><tr><td><%= t.status %></td><td><%= t.n %></td></tr><% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2 class="mt-0">Total revenue</h2>
+  <p style="font-size:1.6rem;font-weight:700">$<%= (totalRevenueCents / 100).toFixed(2) %></p>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,15 @@
+<%- include('partials/header', { title }) %>
+
+<h1 class="mt-0">Profile</h1>
+
+<div class="card" style="max-width:480px">
+  <p><strong>Username:</strong> <%= player.username %></p>
+  <p><strong>Email:</strong> <%= player.email %></p>
+  <p><strong>Role:</strong> <%= player.is_admin ? 'Administrator' : 'Player' %></p>
+  <p><strong>Joined:</strong> <%= new Date(player.created_at).toLocaleDateString() %></p>
+  <hr style="border-color:var(--border)">
+  <p><strong>Score:</strong> <%= score %></p>
+  <p><strong>Solved:</strong> <%= solvedCount %></p>
+</div>
+
+<%- include('partials/footer') %>

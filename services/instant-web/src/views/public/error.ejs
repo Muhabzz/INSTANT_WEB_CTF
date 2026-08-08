@@ -1,0 +1,9 @@
+<%- include('../partials/header', { title, navItems: navItems || [], brandSuffix: brandSuffix || '' }) %>
+
+<div class="card" style="max-width:480px;margin:0 auto;text-align:center">
+  <h1 class="mt-0"><%= title %></h1>
+  <p class="muted"><%= message %></p>
+  <a class="btn" href="/company/">Back home</a>
+</div>
+
+<%- include('../partials/footer') %>

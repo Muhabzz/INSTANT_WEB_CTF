@@ -1,0 +1,13 @@
+<%- include('../partials/header', { title, navItems, brandSuffix }) %>
+
+<h1 class="mt-0">Blog</h1>
+<div class="card">
+  <% posts.forEach(p => { %>
+    <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+      <a href="/company/blog/<%= p.slug %>"><h2 style="margin:0"><%= p.title %></h2></a>
+      <p class="muted" style="margin:4px 0 0">By <%= p.author %> &middot; <%= new Date(p.published_at).toLocaleDateString() %></p>
+    </div>
+  <% }) %>
+</div>
+
+<%- include('../partials/footer') %>

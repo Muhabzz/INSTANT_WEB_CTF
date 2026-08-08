@@ -1,0 +1,25 @@
+<%- include('../partials/header', { title, navItems, brandSuffix }) %>
+
+<h1 class="mt-0">Products</h1>
+
+<form class="stacked" method="GET" action="/company/products/search" style="max-width:420px;margin-bottom:24px">
+  <label for="q">Search products</label>
+  <input id="q" name="q" value="<%= q %>" placeholder="e.g. analytics">
+  <button class="btn" type="submit">Search</button>
+</form>
+
+<div class="grid-3">
+  <% products.forEach(p => { %>
+    <div class="product-card">
+      <div class="muted" style="font-size:0.8rem;text-transform:uppercase"><%= p.category %></div>
+      <h2><%= p.name %></h2>
+      <div class="product-price">$<%= (p.price_cents / 100).toFixed(2) %><span class="muted" style="font-size:0.85rem">/mo</span></div>
+      <p class="muted"><%= p.description %></p>
+    </div>
+  <% }) %>
+  <% if (products.length === 0) { %>
+    <p class="muted">No products matched your search.</p>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · INSTANT WEB CTF</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topnav">
+  <div class="container">
+    <a class="brand" href="/">INSTANT <span>WEB CTF</span></a>
+    <nav class="links">
+      <% if (typeof player !== 'undefined' && player) { %>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/company/" target="_blank" rel="noopener">Company</a>
+        <a href="/challenges">Challenges</a>
+        <a href="/scoreboard">Scoreboard</a>
+        <a href="/profile">Profile</a>
+        <% if (player.is_admin) { %><a href="/admin">Admin</a><% } %>
+        <span class="badge"><%= player.username %></span>
+        <form method="POST" action="/logout" style="display:inline">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn secondary" type="submit">Logout</button>
+        </form>
+      <% } else { %>
+        <a href="/scoreboard">Scoreboard</a>
+        <a href="/login">Login</a>
+        <a class="btn" href="/register">Register</a>
+      <% } %>
+    </nav>
+  </div>
+</header>
+<main class="container">

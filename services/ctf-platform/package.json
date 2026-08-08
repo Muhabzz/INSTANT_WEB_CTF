@@ -1,0 +1,23 @@
+{
+  "name": "ctf-platform",
+  "version": "1.0.0",
+  "description": "INSTANT WEB CTF - platform meta-layer (auth, challenges, scoreboard, admin)",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "migrate": "node src/migrate.js",
+    "seed": "node src/seed.js",
+    "reset": "node src/reset.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "connect-pg-simple": "^9.0.1",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "express-session": "^1.18.0",
+    "pg": "^8.12.0"
+  }
+}

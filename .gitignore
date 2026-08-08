@@ -1,0 +1,38 @@
+# Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+id_rsa*
+*.p12
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Docker
+docker-compose.override.yml
+
+# Database dumps / volumes
+*.sql.gz
+*.dump
+pgdata/
+db-data/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Build artifacts
+dist/
+build/
+coverage/

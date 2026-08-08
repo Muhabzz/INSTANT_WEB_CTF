@@ -1,0 +1,20 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Directory</h1>
+<div class="card">
+  <table>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th></tr></thead>
+    <tbody>
+    <% people.forEach(p => { %>
+      <tr>
+        <td><%= p.name %></td>
+        <td><%= p.email %></td>
+        <td><%= p.role %></td>
+        <td class="muted"><%= p.department || '—' %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/footer') %>

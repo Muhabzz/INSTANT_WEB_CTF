@@ -1,0 +1,9 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Settings</h1>
+<div class="card" style="max-width:480px">
+  <p><strong>Signed in as:</strong> <%= companyUser.name %> (<%= companyUser.email %>)</p>
+  <p class="muted">Company-wide settings management is not yet available in this build.</p>
+</div>
+
+<%- include('../partials/footer') %>

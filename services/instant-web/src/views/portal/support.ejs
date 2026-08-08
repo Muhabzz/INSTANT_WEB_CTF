@@ -1,0 +1,36 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Support</h1>
+
+<div class="grid-2">
+  <div class="card">
+    <h2 class="mt-0">Open a ticket</h2>
+    <% if (formError) { %><div class="alert error"><%= formError %></div><% } %>
+    <form class="stacked" method="POST" action="/company/portal/support">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label for="subject">Subject</label>
+      <input id="subject" name="subject" required>
+      <label for="message">Message</label>
+      <textarea id="message" name="message" rows="4" required></textarea>
+      <button class="btn" type="submit">Submit Ticket</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2 class="mt-0">Your tickets</h2>
+    <table>
+      <thead><tr><th>Subject</th><th>Status</th><th>Opened</th></tr></thead>
+      <tbody>
+      <% tickets.forEach(t => { %>
+        <tr>
+          <td><%= t.subject %></td>
+          <td><span class="pill <%= t.status %>"><%= t.status %></span></td>
+          <td class="muted"><%= new Date(t.created_at).toLocaleDateString() %></td>
+        </tr>
+      <% }) %>
+      <% if (tickets.length === 0) { %><tr><td colspan="3" class="muted">No tickets yet.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

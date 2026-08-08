@@ -1,0 +1,27 @@
+<%- include('partials/header', { title }) %>
+
+<a href="/challenges" class="muted">&larr; Back to challenges</a>
+
+<div class="card" style="margin-top:14px">
+  <span class="badge-pill <%= challenge.solved ? 'solved' : 'open' %>"><%= challenge.solved ? 'Solved' : 'Open' %></span>
+  <h1><%= challenge.title %></h1>
+  <p class="muted">
+    <%= challenge.category %> &middot;
+    <span class="difficulty-<%= challenge.difficulty %>"><%= challenge.difficulty %></span> &middot;
+    <%= challenge.points %> points
+  </p>
+  <p><%= challenge.description %></p>
+
+  <% if (result) { %>
+    <div class="alert <%= result.ok ? 'success' : 'error' %>"><%= result.message %></div>
+  <% } %>
+
+  <form class="stacked" method="POST" action="/challenges/<%= challenge.slug %>/submit" style="max-width:480px">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label for="flag">Flag</label>
+    <input id="flag" name="flag" placeholder="INSTANT{...}" autocomplete="off">
+    <button class="btn" type="submit">Submit Flag</button>
+  </form>
+</div>
+
+<%- include('partials/footer') %>

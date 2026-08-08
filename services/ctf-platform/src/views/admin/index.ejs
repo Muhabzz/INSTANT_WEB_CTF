@@ -1,0 +1,38 @@
+<%- include('../partials/header', { title }) %>
+
+<h1 class="mt-0">Admin</h1>
+<% if (typeof flash !== 'undefined' && flash) { %><div class="alert success"><%= flash %></div><% } %>
+
+<div class="stats-row">
+  <div class="stat"><div class="value"><%= playerCount %></div><div class="label">Players</div></div>
+  <div class="stat"><div class="value"><%= challengeCount %></div><div class="label">Challenges</div></div>
+  <div class="stat"><div class="value"><%= solveCount %></div><div class="label">Solves</div></div>
+</div>
+
+<div class="grid-2" style="margin-top:20px">
+  <div class="card">
+    <h2 class="mt-0">Navigate</h2>
+    <ul>
+      <li><a href="/admin/players">Players</a></li>
+      <li><a href="/admin/challenges">Challenges</a></li>
+      <li><a href="/admin/solves">Solves</a></li>
+      <li><a href="/admin/health">Service Health</a></li>
+    </ul>
+  </div>
+  <div class="card">
+    <h2 class="mt-0">Maintenance</h2>
+    <form method="POST" action="/admin/seed" style="margin-bottom:16px">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn" type="submit">Run Seed</button>
+      <p class="muted" style="font-size:0.85rem">Idempotent — upserts challenges, ensures demo accounts exist.</p>
+    </form>
+    <form method="POST" action="/admin/reset" onsubmit="return confirm('This wipes ALL players, solves, and challenge state. Continue?');">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label for="confirm" class="muted" style="font-size:0.85rem">Type RESET to confirm:</label>
+      <input id="confirm" name="confirm" style="padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text)">
+      <button class="btn danger" type="submit">Reset Platform</button>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

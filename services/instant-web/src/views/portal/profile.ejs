@@ -1,0 +1,10 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Profile</h1>
+<div class="card" style="max-width:480px">
+  <p><strong>Name:</strong> <%= companyUser.name %></p>
+  <p><strong>Email:</strong> <%= companyUser.email %></p>
+  <p><strong>Customer since:</strong> <%= new Date(companyUser.created_at).toLocaleDateString() %></p>
+</div>
+
+<%- include('../partials/footer') %>

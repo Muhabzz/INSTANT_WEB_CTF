@@ -1,0 +1,21 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Documents</h1>
+<a class="btn" href="/company/employee/upload">Add Document</a>
+<div class="card" style="margin-top:16px">
+  <table>
+    <thead><tr><th>Filename</th><th>Description</th><th>Uploaded</th></tr></thead>
+    <tbody>
+    <% documents.forEach(d => { %>
+      <tr>
+        <td><%= d.filename %></td>
+        <td class="muted"><%= d.description %></td>
+        <td class="muted"><%= new Date(d.uploaded_at).toLocaleDateString() %></td>
+      </tr>
+    <% }) %>
+    <% if (documents.length === 0) { %><tr><td colspan="3" class="muted">No documents yet.</td></tr><% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/footer') %>

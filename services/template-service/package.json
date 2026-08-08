@@ -1,0 +1,15 @@
+{
+  "name": "template-service",
+  "version": "1.0.0",
+  "description": "Instant internal template rendering service, internal network only",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2"
+  }
+}
