@@ -34,8 +34,15 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Read by db/init/01-create-app-roles.sh, which only runs once
+      # against a freshly-initialized (empty) data directory.
+      PLATFORM_DB_USER: ${PLATFORM_DB_USER}
+      PLATFORM_DB_PASSWORD: ${PLATFORM_DB_PASSWORD}
+      COMPANY_DB_USER: ${COMPANY_DB_USER}
+      COMPANY_DB_PASSWORD: ${COMPANY_DB_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     networks:
       - db
     healthcheck:
@@ -58,8 +65,10 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Least-privilege role (see db/init/01-create-app-roles.sh) - NOT the
+      # bootstrap POSTGRES_USER/PASSWORD above, which no app service uses.
+      POSTGRES_USER: ${PLATFORM_DB_USER}
+      POSTGRES_PASSWORD: ${PLATFORM_DB_PASSWORD}
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
@@ -67,6 +76,11 @@ services:
       SEED_PLAYER_EMAIL: ${SEED_PLAYER_EMAIL}
       SEED_PLAYER_PASSWORD: ${SEED_PLAYER_PASSWORD}
       COMPANY_HEALTH_URL: http://instant-web:${COMPANY_PORT}/health
+      FLAG_INFO_DISCLOSURE: ${FLAG_INFO_DISCLOSURE}
+      FLAG_SQL_INJECTION: ${FLAG_SQL_INJECTION}
+      FLAG_PATH_TRAVERSAL: ${FLAG_PATH_TRAVERSAL}
+      FLAG_AUTH_BYPASS: ${FLAG_AUTH_BYPASS}
+      FLAG_XSS: ${FLAG_XSS}
     networks:
       - app
       - db
@@ -89,8 +103,10 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Least-privilege role (see db/init/01-create-app-roles.sh) - NOT the
+      # bootstrap POSTGRES_USER/PASSWORD, which no app service uses.
+      POSTGRES_USER: ${COMPANY_DB_USER}
+      POSTGRES_PASSWORD: ${COMPANY_DB_PASSWORD}
       SEED_CUSTOMER_EMAIL: ${SEED_CUSTOMER_EMAIL}
       SEED_CUSTOMER_PASSWORD: ${SEED_CUSTOMER_PASSWORD}
       SEED_EMPLOYEE_EMAIL: ${SEED_EMPLOYEE_EMAIL}
@@ -100,6 +116,11 @@ services:
       INTERNAL_API_URL: ${INTERNAL_API_URL}
       TEMPLATE_SERVICE_URL: ${TEMPLATE_SERVICE_URL}
       INFRA_SERVICE_URL: ${INFRA_SERVICE_URL}
+      FLAG_INFO_DISCLOSURE: ${FLAG_INFO_DISCLOSURE}
+      FLAG_SQL_INJECTION: ${FLAG_SQL_INJECTION}
+      FLAG_PATH_TRAVERSAL: ${FLAG_PATH_TRAVERSAL}
+      FLAG_AUTH_BYPASS: ${FLAG_AUTH_BYPASS}
+      FLAG_XSS: ${FLAG_XSS}
     networks:
       - app
       - db
@@ -120,8 +141,12 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Same least-privilege role as instant-web - same trust domain, and
+      # this is how internal-api can read company tables at all (it owns
+      # none of them itself; company_app owns them via instant-web's
+      # migrations, and Postgres roles have full rights on tables they own).
+      POSTGRES_USER: ${COMPANY_DB_USER}
+      POSTGRES_PASSWORD: ${COMPANY_DB_PASSWORD}
     networks:
       - internal
       - db

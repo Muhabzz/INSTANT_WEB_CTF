@@ -2,6 +2,13 @@
 
 <h1 class="mt-0">Welcome, <%= companyUser.name %></h1>
 
+<% if (companyUser.notes) { %>
+  <div class="card" style="border-color:#c9a227;background:#fffaf0">
+    <h2 class="mt-0">Account Notes</h2>
+    <p><%= companyUser.notes %></p>
+  </div>
+<% } %>
+
 <div class="grid-3">
   <div class="card"><h2 class="mt-0"><%= orderCount %></h2><p class="muted">Total orders</p></div>
   <div class="card"><h2 class="mt-0">$<%= (totalCents / 100).toFixed(2) %></h2><p class="muted">Lifetime spend</p></div>

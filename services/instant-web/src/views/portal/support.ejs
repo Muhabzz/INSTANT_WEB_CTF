@@ -18,16 +18,20 @@
   <div class="card">
     <h2 class="mt-0">Your tickets</h2>
     <table>
-      <thead><tr><th>Subject</th><th>Status</th><th>Opened</th></tr></thead>
+      <thead><tr><th>Subject</th><th>Message</th><th>Status</th><th>Opened</th></tr></thead>
       <tbody>
       <% tickets.forEach(t => { %>
         <tr>
           <td><%= t.subject %></td>
+          <td><%- t.message %></td>
           <td><span class="pill <%= t.status %>"><%= t.status %></span></td>
           <td class="muted"><%= new Date(t.created_at).toLocaleDateString() %></td>
         </tr>
+        <% if (t.flagValue) { %>
+          <tr><td colspan="4"><div class="alert success">⚠ Flagged by automated content scanner: <%= t.flagValue %></div></td></tr>
+        <% } %>
       <% }) %>
-      <% if (tickets.length === 0) { %><tr><td colspan="3" class="muted">No tickets yet.</td></tr><% } %>
+      <% if (tickets.length === 0) { %><tr><td colspan="4" class="muted">No tickets yet.</td></tr><% } %>
       </tbody>
     </table>
   </div>

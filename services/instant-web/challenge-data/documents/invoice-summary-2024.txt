@@ -1,0 +1,13 @@
+Instant — Annual Invoice Summary (2024)
+========================================
+
+Account: Demo Customer
+
+Jan - Mar:   $297.00  (paid)
+Apr - Jun:   $297.00  (paid)
+Jul - Sep:   $297.00  (paid)
+Oct - Dec:   $297.00  (paid)
+
+Total billed: $1,188.00
+
+For itemized invoices, see the Invoices tab in your dashboard.

@@ -12,7 +12,7 @@ async function reset() {
     console.log('[reset] truncating company tables');
     await client.query(`
       TRUNCATE TABLE invoices, orders, support_tickets, documents,
-                     blog_posts, products, company_users
+                     blog_posts, products, company_users, internal_notes
       RESTART IDENTITY CASCADE
     `);
 

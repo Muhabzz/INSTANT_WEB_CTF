@@ -1,0 +1,20 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Documents</h1>
+<p class="muted">Generated reports for your account. Available any time.</p>
+
+<div class="card">
+  <table>
+    <thead><tr><th>Report</th><th></th></tr></thead>
+    <tbody>
+    <% files.forEach(f => { %>
+      <tr>
+        <td><%= f %></td>
+        <td><a href="/company/portal/documents/download?file=<%= encodeURIComponent(f) %>">Download</a></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/footer') %>

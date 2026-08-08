@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · Instant</title>
+  <style>
+    body { font-family: Verdana, Geneva, sans-serif; background: #d9d9d9; margin: 0; padding: 40px 0; }
+    .box { max-width: 340px; margin: 0 auto; background: #fff; border: 1px solid #999; padding: 18px; }
+    h1 { font-size: 1.1rem; margin: 0 0 4px; }
+    p.sub { color: #555; font-size: 0.8rem; margin-top: 0; }
+    label { display: block; font-size: 0.85rem; margin-bottom: 4px; }
+    input { width: 100%; padding: 6px; margin-bottom: 12px; border: 1px solid #999; box-sizing: border-box; }
+    button { background: #444; color: #fff; border: none; padding: 8px 16px; cursor: pointer; }
+    .error { color: #a00; font-size: 0.85rem; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Instant Customer Login (Legacy)</h1>
+    <p class="sub">This login form is retained for older integrations and will be removed in a future release.</p>
+    <% if (error) { %><p class="error"><%= error %></p><% } %>
+    <form method="POST" action="/company/portal/legacy-login">
+      <label for="email">Email</label>
+      <input id="email" name="email" value="<%= formValues.email || '' %>">
+      <label for="password">Password</label>
+      <input id="password" type="password" name="password">
+      <button type="submit">Log In</button>
+    </form>
+  </div>
+</body>
+</html>

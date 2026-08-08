@@ -8,42 +8,100 @@ function hashFlag(flag) {
   return crypto.createHash('sha256').update(flag, 'utf8').digest('hex');
 }
 
-// Phase 1: only "getting-started" is enabled and solvable end-to-end, to
-// validate the challenge/flag submission framework. The remaining 17 rows
-// are placeholders reserving the slug/category/points/order for each
-// planned challenge; their real vulnerable implementations and real flags
-// arrive in later phases. Flags below are synthetic placeholders.
+// Phase 2: challenges 01-05 are real, enabled, and live inside the Instant
+// company application (services/instant-web). See docs/CHALLENGES.md for
+// the intended discovery/exploitation path for each one (admin-only doc -
+// player-facing text below is deliberately non-spoiling beyond the title,
+// same as any real CTF's challenge catalog).
+//
+// The remaining 13 rows are placeholders reserving slug/category/points for
+// challenges 06-18, arriving in later phases. Disabled, hidden from players.
+//
+// NOTE: Phase 1 seeded a different slug set (getting-started,
+// public-product-catalog, customer-auth, etc). Upgrading an existing Phase 1
+// deployment to Phase 2 should use `scripts/reset.sh`, not just
+// `scripts/seed.sh` - re-seeding alone leaves the old Phase 1 rows in place
+// as orphaned, still-enabled challenges since their slugs no longer appear
+// in this list.
 const CHALLENGES = [
   {
-    slug: 'getting-started',
-    title: 'Getting Started',
+    slug: 'information-disclosure',
+    title: 'Information Disclosure',
     description:
-      'Welcome to INSTANT WEB CTF. This challenge exists to confirm your dashboard, ' +
-      'flag submission, and scoreboard are working. Submit the flag shown here: ' +
-      'INSTANT{welcome_to_instant}',
-    category: 'Getting Started',
+      "Instant's engineering team moves fast - sometimes a little too fast. " +
+      'See what you can find by exploring the public site a bit more closely ' +
+      'than a normal visitor would.',
+    category: 'Public Website',
     difficulty: 'beginner',
-    points: 10,
-    flag: 'INSTANT{welcome_to_instant}',
+    points: 50,
+    flag: config.flags.infoDisclosure,
     enabled: true,
     order_index: 1,
   },
-  { slug: 'public-product-catalog', title: 'Product Catalog Recon', category: 'Public Website', difficulty: 'beginner', points: 50, order_index: 2 },
-  { slug: 'public-blog-metadata', title: 'Blog Metadata Exposure', category: 'Public Website', difficulty: 'beginner', points: 50, order_index: 3 },
-  { slug: 'customer-auth', title: 'Customer Portal Authentication', category: 'Customer Portal', difficulty: 'easy', points: 100, order_index: 4 },
-  { slug: 'customer-order-access', title: 'Order Access Control', category: 'Customer Portal', difficulty: 'easy', points: 125, order_index: 5 },
-  { slug: 'customer-invoice-handling', title: 'Invoice Handling', category: 'Customer Portal', difficulty: 'medium', points: 150, order_index: 6 },
-  { slug: 'customer-support-tickets', title: 'Support Ticket Exposure', category: 'Customer Portal', difficulty: 'medium', points: 150, order_index: 7 },
-  { slug: 'employee-auth', title: 'Employee Portal Authentication', category: 'Employee Portal', difficulty: 'easy', points: 125, order_index: 8 },
-  { slug: 'employee-directory', title: 'Employee Directory Exposure', category: 'Employee Portal', difficulty: 'medium', points: 150, order_index: 9 },
-  { slug: 'employee-documents', title: 'Document Handling', category: 'Employee Portal', difficulty: 'medium', points: 175, order_index: 10 },
-  { slug: 'employee-file-upload', title: 'File Upload Handling', category: 'Employee Portal', difficulty: 'hard', points: 200, order_index: 11 },
-  { slug: 'employee-analytics', title: 'Analytics Dashboard', category: 'Employee Portal', difficulty: 'medium', points: 150, order_index: 12 },
-  { slug: 'company-admin-access', title: 'Company Admin Access Control', category: 'Company Admin', difficulty: 'hard', points: 225, order_index: 13 },
-  { slug: 'company-admin-users', title: 'Admin User Management', category: 'Company Admin', difficulty: 'hard', points: 225, order_index: 14 },
-  { slug: 'internal-api-exposure', title: 'Internal API Exposure', category: 'Internal Services', difficulty: 'hard', points: 250, order_index: 15 },
-  { slug: 'template-service-rendering', title: 'Template Rendering', category: 'Internal Services', difficulty: 'advanced', points: 275, order_index: 16 },
-  { slug: 'infra-service-recon', title: 'Infrastructure Service Recon', category: 'Internal Services', difficulty: 'advanced', points: 275, order_index: 17 },
+  {
+    slug: 'sql-injection',
+    title: 'SQL Injection',
+    description:
+      "The product search on Instant's public site queries a real database " +
+      'behind the scenes. Explore how it handles unusual input.',
+    category: 'Public Website',
+    difficulty: 'beginner',
+    points: 50,
+    flag: config.flags.sqlInjection,
+    enabled: true,
+    order_index: 2,
+  },
+  {
+    slug: 'path-traversal',
+    title: 'Path Traversal',
+    description:
+      'Instant customers can generate and download account reports. Take a ' +
+      'close look at how the download feature selects which file to serve.',
+    category: 'Customer Portal',
+    difficulty: 'beginner',
+    points: 50,
+    flag: config.flags.pathTraversal,
+    enabled: true,
+    order_index: 3,
+  },
+  {
+    slug: 'auth-bypass',
+    title: 'Authentication Bypass',
+    description:
+      'Not every login form at Instant gets the same attention. Some older ' +
+      'flows may not have kept up with the rest of the platform.',
+    category: 'Customer Portal',
+    difficulty: 'beginner',
+    points: 75,
+    flag: config.flags.authBypass,
+    enabled: true,
+    order_index: 4,
+  },
+  {
+    slug: 'xss',
+    title: 'Cross-Site Scripting',
+    description:
+      "Instant's support team reviews every ticket that comes in. What " +
+      'happens if a ticket contains more than plain text?',
+    category: 'Customer Portal',
+    difficulty: 'beginner',
+    points: 75,
+    flag: config.flags.xss,
+    enabled: true,
+    order_index: 5,
+  },
+  { slug: 'public-blog-metadata', title: 'Blog Metadata Exposure', category: 'Public Website', difficulty: 'beginner', points: 50, order_index: 6 },
+  { slug: 'customer-order-access', title: 'Order Access Control', category: 'Customer Portal', difficulty: 'easy', points: 125, order_index: 7 },
+  { slug: 'customer-invoice-handling', title: 'Invoice Handling', category: 'Customer Portal', difficulty: 'medium', points: 150, order_index: 8 },
+  { slug: 'employee-auth', title: 'Employee Portal Authentication', category: 'Employee Portal', difficulty: 'easy', points: 125, order_index: 9 },
+  { slug: 'employee-directory', title: 'Employee Directory Exposure', category: 'Employee Portal', difficulty: 'medium', points: 150, order_index: 10 },
+  { slug: 'employee-documents', title: 'Document Handling', category: 'Employee Portal', difficulty: 'medium', points: 175, order_index: 11 },
+  { slug: 'employee-file-upload', title: 'File Upload Handling', category: 'Employee Portal', difficulty: 'hard', points: 200, order_index: 12 },
+  { slug: 'employee-analytics', title: 'Analytics Dashboard', category: 'Employee Portal', difficulty: 'medium', points: 150, order_index: 13 },
+  { slug: 'company-admin-access', title: 'Company Admin Access Control', category: 'Company Admin', difficulty: 'hard', points: 225, order_index: 14 },
+  { slug: 'company-admin-users', title: 'Admin User Management', category: 'Company Admin', difficulty: 'hard', points: 225, order_index: 15 },
+  { slug: 'internal-api-exposure', title: 'Internal API Exposure', category: 'Internal Services', difficulty: 'hard', points: 250, order_index: 16 },
+  { slug: 'template-service-rendering', title: 'Template Rendering', category: 'Internal Services', difficulty: 'advanced', points: 275, order_index: 17 },
   { slug: 'full-chain-compromise', title: 'Full Chain: Company Compromise', category: 'Attack Chain', difficulty: 'advanced', points: 400, order_index: 18 },
 ];
 

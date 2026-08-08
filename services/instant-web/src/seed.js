@@ -23,14 +23,17 @@ async function seedCompanyUsers(client) {
   const customerHash = await bcrypt.hash(config.seed.customerPassword, 12);
   const employeeHash = await bcrypt.hash(config.seed.employeePassword, 12);
   const adminHash = await bcrypt.hash(config.seed.companyAdminPassword, 12);
+  // Random, never-communicated password - this account is never meant to be
+  // reached via a normal, correctly-guessed login (see challenge 04).
+  const vipHash = await bcrypt.hash(require('crypto').randomBytes(24).toString('hex'), 12);
 
-  const upsert = async (name, email, hash, role, department) => {
+  const upsert = async (name, email, hash, role, department, notes) => {
     const { rows } = await client.query(
-      `INSERT INTO company_users (name, email, password_hash, role, department)
-       VALUES ($1,$2,$3,$4,$5)
+      `INSERT INTO company_users (name, email, password_hash, role, department, notes)
+       VALUES ($1,$2,$3,$4,$5,$6)
        ON CONFLICT (email) DO NOTHING
        RETURNING id`,
-      [name, email, hash, role, department]
+      [name, email, hash, role, department, notes || null]
     );
     if (rows[0]) return rows[0].id;
     const existing = await client.query('SELECT id FROM company_users WHERE email = $1', [email]);
@@ -40,6 +43,20 @@ async function seedCompanyUsers(client) {
   const customerId = await upsert('Jordan Customer', config.seed.customerEmail, customerHash, 'customer', null);
   const employeeId = await upsert('Sam Employee', config.seed.employeeEmail, employeeHash, 'employee', 'Support');
   const adminId = await upsert('Riley Admin', config.seed.companyAdminEmail, adminHash, 'admin', 'Operations');
+
+  // Challenge 04 (Authentication Bypass) target account: a VIP enterprise
+  // customer with no publicly known credentials. Reachable only via the
+  // vulnerable legacy login endpoint (see routes/portal.js).
+  await upsert(
+    'Alexandra Chen',
+    'alexandra.chen@meridiancapital.example',
+    vipHash,
+    'customer',
+    null,
+    'VIP account - Meridian Capital enterprise renewal in progress, handle ' +
+      'personally. Do not share account details outside the account team. ' +
+      `Internal tracking ref: ${config.flags.authBypass}`
+  );
 
   console.log('[seed] ensured customer/employee/admin company accounts exist');
   return { customerId, employeeId, adminId };
@@ -122,6 +139,28 @@ async function seedSupportTickets(client, customerId) {
   console.log('[seed] created demo support tickets');
 }
 
+async function seedInternalNotes(client) {
+  const { rows: existing } = await client.query('SELECT COUNT(*)::int AS n FROM internal_notes');
+  if (existing[0].n > 0) return;
+
+  // Challenge 02 (SQL Injection) target row: never read by any normal
+  // application feature, reachable only via the UNION-based injection in
+  // the product search endpoint (see routes/public.js).
+  await client.query(
+    `INSERT INTO internal_notes (title, reference, content, priority, tag) VALUES ($1,$2,$3,$4,$5)`,
+    [
+      'Q3 Security Audit - Action Items',
+      'SEC-2024-1187',
+      'Product search endpoint flagged during external pen test for improper ' +
+        `input handling on the "q" parameter. Tracking ref: ${config.flags.sqlInjection}. ` +
+        'Remediate before next release.',
+      1,
+      'internal',
+    ]
+  );
+  console.log('[seed] created internal engineering memo');
+}
+
 async function seedDocuments(client, employeeId) {
   const { rows: existing } = await client.query(
     'SELECT COUNT(*)::int AS n FROM documents WHERE employee_id = $1',
@@ -149,6 +188,7 @@ async function seed() {
     await seedOrdersAndInvoices(client, customerId);
     await seedSupportTickets(client, customerId);
     await seedDocuments(client, employeeId);
+    await seedInternalNotes(client);
   } finally {
     client.release();
   }

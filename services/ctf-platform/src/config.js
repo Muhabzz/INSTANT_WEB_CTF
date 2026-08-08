@@ -33,4 +33,14 @@ module.exports = {
     playerEmail: process.env.SEED_PLAYER_EMAIL || 'demo_player@instant-ctf.local',
     playerPassword: process.env.SEED_PLAYER_PASSWORD || 'change_me_player_password',
   },
+  // Plaintext flag values, used only at seed time to compute flag_hash.
+  // instant-web reads the same env vars to embed these at the vulnerable
+  // locations - see .env.example.
+  flags: {
+    infoDisclosure: required('FLAG_INFO_DISCLOSURE'),
+    sqlInjection: required('FLAG_SQL_INJECTION'),
+    pathTraversal: required('FLAG_PATH_TRAVERSAL'),
+    authBypass: required('FLAG_AUTH_BYPASS'),
+    xss: required('FLAG_XSS'),
+  },
 };

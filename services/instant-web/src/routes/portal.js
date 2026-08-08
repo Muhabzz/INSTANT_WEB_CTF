@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
@@ -5,6 +6,7 @@ const { query } = require('../db');
 const { customerAuth } = require('../middleware/portalAuth');
 const { ensureCsrfToken, verifyCsrfToken } = require('../middleware/csrf');
 const logger = require('../logger');
+const config = require('../config');
 
 const router = express.Router();
 
@@ -30,6 +32,7 @@ const NAV_AUTH = [
   { href: '/company/portal/dashboard', label: 'Dashboard' },
   { href: '/company/portal/orders', label: 'Orders' },
   { href: '/company/portal/invoices', label: 'Invoices' },
+  { href: '/company/portal/documents', label: 'Documents' },
   { href: '/company/portal/support', label: 'Support' },
   { href: '/company/portal/settings', label: 'Settings' },
 ];
@@ -111,6 +114,48 @@ router.post('/login', authLimiter, verifyCsrfToken, async (req, res, next) => {
   }
 });
 
+// Challenge 04 (Authentication Bypass). A deprecated login flow kept
+// mounted for "backwards compatibility" (per the debug endpoint's notes -
+// see routes/public.js) and never updated to use the same parameterized
+// queries and CSRF protection as the real /login above. Not linked from
+// any page; discoverable via robots.txt or generic path guessing.
+router.get('/legacy-login', (req, res) => {
+  if (req.companyUser) return res.redirect('/company/portal/dashboard');
+  res.render('portal/legacy_login', { title: 'Legacy Customer Login', error: null, formValues: {} });
+});
+
+router.post('/legacy-login', authLimiter, async (req, res, next) => {
+  const { email = '', password = '' } = req.body;
+  try {
+    // Raw string concatenation, no parameterization, no CSRF check - a
+    // single quote in `email` breaks out of the literal and a trailing
+    // `-- ` comments out the password/role checks entirely, authenticating
+    // as whichever row the injected WHERE clause matches.
+    const sql = `SELECT id, name, email, role FROM company_users
+       WHERE email = '${email}' AND password_hash = '${password}' AND role = 'customer' LIMIT 1`;
+    const { rows } = await query(sql);
+    const user = rows[0];
+
+    if (!user) {
+      logger.warn('legacy_login_failed', { email });
+      return res.status(401).render('portal/legacy_login', {
+        title: 'Legacy Customer Login',
+        error: 'Invalid email or password.',
+        formValues: { email },
+      });
+    }
+
+    req.session.regenerate((err) => {
+      if (err) return next(err);
+      req.session.userId = user.id;
+      logger.warn('legacy_login_succeeded', { userId: user.id });
+      res.redirect('/company/portal/dashboard');
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/logout', verifyCsrfToken, (req, res, next) => {
   req.session.destroy((err) => {
     if (err) return next(err);
@@ -171,13 +216,63 @@ router.get('/invoices', customerAuth.requireAuth, async (req, res, next) => {
   }
 });
 
+// Synthetic, always-available reports - not customer-specific, just
+// realistic filler representing generated account reports.
+const REPORT_FILES = ['welcome-guide.txt', 'usage-report-q3.txt', 'invoice-summary-2024.txt'];
+
+router.get('/documents', customerAuth.requireAuth, (req, res) => {
+  res.render('portal/documents', { title: 'Documents', files: REPORT_FILES });
+});
+
+router.get('/documents/download', customerAuth.requireAuth, (req, res) => {
+  // Challenge 03 (Path Traversal). Intended restriction: stay inside
+  // challengeData.documentsDir. Actual check below is against the parent
+  // challengeData.root instead - a realistic off-by-one-directory mistake
+  // (the kind that happens when a "reports" feature and a later "protected
+  // internal files" folder get added to the same parent directory and the
+  // check is copy-pasted without updating which directory it guards).
+  // Either way this stays fully inside the app's own bundled challenge-data
+  // tree, baked into the image - there is no host filesystem, Docker
+  // socket, or credential file reachable from here.
+  const requested = (req.query.file || '').toString();
+  const resolved = path.resolve(config.challengeData.documentsDir, requested);
+
+  if (!resolved.startsWith(config.challengeData.root)) {
+    return res.status(400).render('error', {
+      title: 'Invalid Request',
+      message: 'That file parameter is not valid.',
+    });
+  }
+
+  res.sendFile(resolved, (err) => {
+    if (err) {
+      res.status(404).render('error', { title: 'Not Found', message: 'File not found.' });
+    }
+  });
+});
+
+// Challenge 05 (XSS). The ticket MESSAGE is rendered unescaped on both this
+// page (portal/support.ejs) and the employee ticket queue
+// (employee/tickets.ejs) - a real stored XSS, genuinely exploitable against
+// any real browser that views either page, not just simulated. There is no
+// automated "agent" browser in this environment to detonate a payload
+// against, so as a practical, honestly-documented stand-in, the flag is
+// revealed directly on the submitting customer's own ticket list the moment
+// their ticket is detected (at creation time) to contain an actual
+// <script> tag - i.e. exactly the payload shape that would execute given
+// the missing output encoding, whether or not anyone else ever views it.
+async function loadTickets(customerId) {
+  const { rows } = await query(
+    'SELECT id, subject, message, status, flagged, created_at FROM support_tickets WHERE customer_id = $1 ORDER BY created_at DESC',
+    [customerId]
+  );
+  return rows.map((t) => ({ ...t, flagValue: t.flagged ? config.flags.xss : null }));
+}
+
 router.get('/support', customerAuth.requireAuth, async (req, res, next) => {
   try {
-    const { rows } = await query(
-      'SELECT id, subject, message, status, created_at FROM support_tickets WHERE customer_id = $1 ORDER BY created_at DESC',
-      [req.companyUser.id]
-    );
-    res.render('portal/support', { title: 'Support', tickets: rows, formError: null });
+    const tickets = await loadTickets(req.companyUser.id);
+    res.render('portal/support', { title: 'Support', tickets, formError: null });
   } catch (err) {
     next(err);
   }
@@ -187,21 +282,19 @@ router.post('/support', customerAuth.requireAuth, verifyCsrfToken, async (req, r
   const { subject = '', message = '' } = req.body;
   try {
     if (subject.trim().length < 3 || message.trim().length < 3) {
-      const { rows } = await query(
-        'SELECT id, subject, message, status, created_at FROM support_tickets WHERE customer_id = $1 ORDER BY created_at DESC',
-        [req.companyUser.id]
-      );
+      const tickets = await loadTickets(req.companyUser.id);
       return res.status(400).render('portal/support', {
         title: 'Support',
-        tickets: rows,
+        tickets,
         formError: 'Please provide a subject and message.',
       });
     }
+    const containsScriptTag = /<script/i.test(subject) || /<script/i.test(message);
     await query(
-      `INSERT INTO support_tickets (customer_id, subject, message, status) VALUES ($1,$2,$3,'open')`,
-      [req.companyUser.id, subject.trim(), message.trim()]
+      `INSERT INTO support_tickets (customer_id, subject, message, status, flagged) VALUES ($1,$2,$3,'open',$4)`,
+      [req.companyUser.id, subject.trim(), message.trim(), containsScriptTag]
     );
-    logger.info('support_ticket_created', { userId: req.companyUser.id });
+    logger.info('support_ticket_created', { userId: req.companyUser.id, flagged: containsScriptTag });
     res.redirect('/company/portal/support');
   } catch (err) {
     next(err);

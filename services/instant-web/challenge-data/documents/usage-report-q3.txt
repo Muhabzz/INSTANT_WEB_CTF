@@ -1,0 +1,13 @@
+Instant — Usage Report (Q3 2026)
+================================
+
+Account: Demo Customer
+Period: Jul 1, 2026 - Sep 30, 2026
+
+Automations run:           4,812
+Average automations/day:   52
+API calls:                 118,230
+Active integrations:       6
+Uptime (your workspace):   99.97%
+
+Thanks for being an Instant customer. See the Analytics tab for live data.

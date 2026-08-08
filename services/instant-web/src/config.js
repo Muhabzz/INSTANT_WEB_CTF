@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path');
 
 function required(name, fallback) {
   const value = process.env[name] ?? fallback;
@@ -37,5 +38,23 @@ module.exports = {
     employeePassword: process.env.SEED_EMPLOYEE_PASSWORD || 'change_me_employee_password',
     companyAdminEmail: process.env.SEED_COMPANY_ADMIN_EMAIL || 'riley.admin@instant.example',
     companyAdminPassword: process.env.SEED_COMPANY_ADMIN_PASSWORD || 'change_me_company_admin_password',
+  },
+  // Plaintext flag values embedded/served at each challenge's vulnerable
+  // location. ctf-platform reads the same env vars to compute flag_hash -
+  // see .env.example.
+  flags: {
+    infoDisclosure: required('FLAG_INFO_DISCLOSURE'),
+    sqlInjection: required('FLAG_SQL_INJECTION'),
+    pathTraversal: required('FLAG_PATH_TRAVERSAL'),
+    authBypass: required('FLAG_AUTH_BYPASS'),
+    xss: required('FLAG_XSS'),
+  },
+  // Root of the synthetic filesystem area used by the path-traversal
+  // challenge (challenge 03). Baked into the Docker image; never a host
+  // bind mount. See docs/CHALLENGES.md.
+  challengeData: {
+    root: path.join(__dirname, '..', 'challenge-data'),
+    documentsDir: path.join(__dirname, '..', 'challenge-data', 'documents'),
+    protectedDir: path.join(__dirname, '..', 'challenge-data', 'protected'),
   },
 };

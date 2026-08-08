@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 
 const config = require('./config');
@@ -52,7 +53,21 @@ app.use((err, req, res, next) => {
   res.status(500).render('error', { title: 'Server Error', message: 'Something went wrong.' });
 });
 
+function writeChallengeFiles() {
+  // Challenge 03 (Path Traversal) target file. Written at startup from the
+  // FLAG_PATH_TRAVERSAL env var rather than baked into the image, so the
+  // single source of truth stays .env like every other flag. Lives outside
+  // the "documents" directory the download feature is meant to be
+  // restricted to - see routes/portal.js.
+  fs.mkdirSync(config.challengeData.protectedDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(config.challengeData.protectedDir, 'flag.txt'),
+    `${config.flags.pathTraversal}\n`
+  );
+}
+
 async function start() {
+  writeChallengeFiles();
   await runMigrations();
   app.listen(config.port, () => {
     logger.info('server_started', { port: config.port, env: config.env });

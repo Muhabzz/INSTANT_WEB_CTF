@@ -9,7 +9,11 @@ RUN npm install --omit=dev --no-audit --no-fund
 
 COPY src ./src
 COPY migrations ./migrations
+COPY challenge-data ./challenge-data
 
+# challenge-data/protected is created and (re)written at container startup
+# from the FLAG_PATH_TRAVERSAL env var (see src/index.js) - the `app` user
+# needs write access to it, unlike the rest of the read-only application code.
 RUN chown -R app:app /app
 USER app
 
