@@ -19,6 +19,10 @@ module.exports = {
     employee: required('COMPANY_EMPLOYEE_SESSION_SECRET'),
     admin: required('COMPANY_ADMIN_SESSION_SECRET'),
   },
+  // Signs/verifies JWTs issued by the customer-facing "Instant API" (see
+  // routes/api.js, challenge 07). Distinct from every session secret above -
+  // this is a bearer-token API credential, not a cookie.
+  apiJwtSecret: required('COMPANY_API_JWT_SECRET'),
   db: {
     host: process.env.POSTGRES_HOST || 'postgres',
     port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
@@ -48,13 +52,25 @@ module.exports = {
     pathTraversal: required('FLAG_PATH_TRAVERSAL'),
     authBypass: required('FLAG_AUTH_BYPASS'),
     xss: required('FLAG_XSS'),
+    idor: required('FLAG_IDOR'),
+    jwt: required('FLAG_JWT'),
+    businessLogic: required('FLAG_BUSINESS_LOGIC'),
+    csrf: required('FLAG_CSRF'),
+    fileUpload: required('FLAG_FILE_UPLOAD'),
+    lfi: required('FLAG_LFI'),
+    advancedSqli: required('FLAG_ADVANCED_SQLI'),
   },
   // Root of the synthetic filesystem area used by the path-traversal
-  // challenge (challenge 03). Baked into the Docker image; never a host
-  // bind mount. See docs/CHALLENGES.md.
+  // challenge (challenge 03), the avatar upload challenge (challenge 10),
+  // and the LFI challenge (challenge 11). Baked into the Docker image /
+  // created at container startup under the app's own working directory;
+  // never a host bind mount. See docs/CHALLENGES.md.
   challengeData: {
     root: path.join(__dirname, '..', 'challenge-data'),
     documentsDir: path.join(__dirname, '..', 'challenge-data', 'documents'),
     protectedDir: path.join(__dirname, '..', 'challenge-data', 'protected'),
+    uploadsDir: path.join(__dirname, '..', 'challenge-data', 'uploads'),
+    receiptTemplatesDir: path.join(__dirname, '..', 'challenge-data', 'receipt-templates'),
+    internalBillingDir: path.join(__dirname, '..', 'challenge-data', 'internal-billing'),
   },
 };

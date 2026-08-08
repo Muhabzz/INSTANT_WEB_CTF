@@ -1,10 +1,35 @@
 <%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
 
 <h1 class="mt-0">Profile</h1>
-<div class="card" style="max-width:480px">
-  <p><strong>Name:</strong> <%= companyUser.name %></p>
-  <p><strong>Email:</strong> <%= companyUser.email %></p>
-  <p><strong>Customer since:</strong> <%= new Date(companyUser.created_at).toLocaleDateString() %></p>
+<div class="grid-2">
+  <div class="card" style="max-width:480px">
+    <p><strong>Name:</strong> <%= companyUser.name %></p>
+    <p><strong>Email:</strong> <%= companyUser.email %></p>
+    <p><strong>Customer since:</strong> <%= new Date(companyUser.created_at).toLocaleDateString() %></p>
+  </div>
+
+  <div class="card" style="max-width:480px">
+    <h2 class="mt-0">Avatar</h2>
+    <% if (companyUser.avatar_filename) { %>
+      <p><a href="/company/portal/uploads/<%= companyUser.avatar_filename %>" target="_blank" rel="noopener">View current avatar</a></p>
+    <% } else { %>
+      <p class="muted">No avatar uploaded yet.</p>
+    <% } %>
+    <% if (avatarFlag) { %>
+      <div class="alert success">
+        <strong>Automated content scanner:</strong> the last uploaded file's
+        content did not match its declared image type.
+        Reference: <%= avatarFlag %>
+      </div>
+    <% } %>
+    <% if (uploadError) { %><div class="alert error"><%= uploadError %></div><% } %>
+    <form class="stacked" method="POST" action="/company/portal/profile/avatar" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label for="avatar">Upload a PNG, JPEG, or GIF</label>
+      <input id="avatar" name="avatar" type="file" required>
+      <button class="btn" type="submit">Upload</button>
+    </form>
+  </div>
 </div>
 
 <%- include('../partials/footer') %>

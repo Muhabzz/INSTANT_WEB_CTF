@@ -14,6 +14,7 @@ const NAV = [
   { href: '/company/careers', label: 'Careers' },
   { href: '/company/blog', label: 'Blog' },
   { href: '/company/support', label: 'Support' },
+  { href: '/company/track-order', label: 'Track Order' },
   { href: '/company/contact', label: 'Contact' },
   { href: '/company/portal/login', label: 'Customer Login' },
   { href: '/company/employee/login', label: 'Employee Login' },
@@ -34,18 +35,31 @@ router.get('/', (req, res) => {
 // crawlers respect this; a curious human reads it as a map of what the site
 // doesn't want indexed - including an undocumented debug endpoint and an
 // old login flow that both should have been removed before launch.
+//
+// The debug and protected-reports entries below list the exact path, not
+// just a directory prefix - the same mistake that got the endpoint here in
+// the first place (someone reflexively added a Disallow line without
+// thinking about what that reveals to a human reader, rather than actually
+// removing the leftover endpoint/report).
 router.get('/robots.txt', (req, res) => {
   res.type('text/plain').send(
-    ['User-agent: *', 'Disallow: /debug/', 'Disallow: /portal/legacy-login', ''].join('\n')
+    [
+      'User-agent: *',
+      'Disallow: /debug/deploy-status-8f3a',
+      'Disallow: /portal/legacy-login',
+      'Disallow: /portal/settings/quick-unsubscribe',
+      'Disallow: /portal/documents/protected/flag.txt',
+      '',
+    ].join('\n')
   );
 });
 
 // Challenge 01 (Information Disclosure) - part two: an undocumented debug
 // endpoint, left mounted and unauthenticated. Deliberately not linked from
-// anywhere in the UI; only discoverable via robots.txt above (or generic
-// recon/wordlist guessing). Returns realistic-looking deploy/debug info; the
-// flag rides along in the "notes" field the way a leftover TODO comment
-// would, and the same notes field hints at challenge 04's endpoint.
+// anywhere in the UI; discoverable via the exact path robots.txt now lists
+// above. Returns realistic-looking deploy/debug info; the flag rides along
+// in the "notes" field the way a leftover TODO comment would, and the same
+// notes field hints at challenge 04's endpoint.
 router.get('/debug/deploy-status-8f3a', (req, res) => {
   res.json({
     service: 'instant-web',
@@ -125,6 +139,54 @@ router.get('/blog/:slug', async (req, res, next) => {
 
 router.get('/support', (req, res) => {
   res.render('public/support', { title: 'Support' });
+});
+
+router.get('/track-order', (req, res) => {
+  res.render('public/track_order', { title: 'Track Your Order', submitted: false, found: null, orderId: '', email: '' });
+});
+
+router.post('/track-order', async (req, res, next) => {
+  const orderId = (req.body.order_id || '').toString().trim();
+  const email = (req.body.email || '').toString().trim();
+
+  // Challenge 13 (Advanced SQL Injection). Meaningfully different from
+  // challenge 02: this is a NUMERIC-context injection point (order_id is
+  // never quoted, so no quote-escaping is needed to break out), and unlike
+  // the product search, the response here only ever reveals a boolean
+  // signal - "an order matching that id and email exists" or "it doesn't"
+  // - never any row data. A UNION SELECT would change the column shape
+  // returned but nothing is ever echoed back to confirm it, so UNION-based
+  // extraction doesn't apply here; the intended technique is boolean-based
+  // blind SQL injection, e.g.
+  //   order_id = 0 OR (SELECT substring(escalation_note,1,1)
+  //                     FROM support_escalations LIMIT 1)='I' --
+  // which comments out the trailing email check (same comment-bypass idea
+  // as challenge 04) and turns the found/not-found response into a single
+  // bit of a much larger extraction, one character/position at a time.
+  const sql = `SELECT o.id FROM orders o JOIN company_users u ON u.id = o.customer_id
+     WHERE o.id = ${orderId || 0} AND u.email = '${email}' LIMIT 1`;
+
+  try {
+    const { rows } = await query(sql);
+    res.render('public/track_order', {
+      title: 'Track Your Order',
+      submitted: true,
+      found: rows.length > 0,
+      orderId,
+      email,
+    });
+  } catch (err) {
+    // A malformed query is itself a (weaker) oracle bit, but the intended
+    // primary technique is the found/not-found boolean above, which never
+    // requires triggering a syntax error.
+    res.render('public/track_order', {
+      title: 'Track Your Order',
+      submitted: true,
+      found: false,
+      orderId,
+      email,
+    });
+  }
 });
 
 module.exports = router;

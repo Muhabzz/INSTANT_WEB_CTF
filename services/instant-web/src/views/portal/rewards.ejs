@@ -1,0 +1,32 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Rewards</h1>
+<div class="grid-2">
+  <div class="card">
+    <h2 class="mt-0">Your balance</h2>
+    <p style="font-size:1.5rem"><strong><%= balance.toLocaleString() %></strong> points</p>
+    <% if (formError) { %><div class="alert error"><%= formError %></div><% } %>
+    <form class="stacked" method="POST" action="/company/portal/rewards/redeem">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label for="points">Redeem points for account credit (100 pts = $5)</label>
+      <input id="points" name="points" type="number" required>
+      <button class="btn" type="submit">Redeem</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2 class="mt-0">Tiers</h2>
+    <ul>
+      <li>Bronze - 0 pts</li>
+      <li>Silver - 1,000 pts</li>
+      <li>Gold - 10,000 pts</li>
+      <li>Platinum Concierge - 100,000 pts</li>
+    </ul>
+    <% if (unlocked) { %>
+      <div class="alert success">
+        <strong>Platinum Concierge unlocked.</strong> Access code: <%= flag %>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

@@ -8,21 +8,37 @@ function hashFlag(flag) {
   return crypto.createHash('sha256').update(flag, 'utf8').digest('hex');
 }
 
-// Phase 2: challenges 01-05 are real, enabled, and live inside the Instant
-// company application (services/instant-web). See docs/CHALLENGES.md for
-// the intended discovery/exploitation path for each one (admin-only doc -
-// player-facing text below is deliberately non-spoiling beyond the title,
-// same as any real CTF's challenge catalog).
+// Phase 2/3/4: challenges 01-11 and 13 are real, enabled, and live inside
+// the Instant company application (services/instant-web). See
+// docs/CHALLENGES.md for the intended discovery/exploitation path for each
+// one (admin-only doc - player-facing text below is deliberately
+// non-spoiling beyond the title, same as any real CTF's challenge catalog).
 //
-// The remaining 13 rows are placeholders reserving slug/category/points for
-// challenges 06-18, arriving in later phases. Disabled, hidden from players.
+// Challenge 12 (Command Injection) was deliberately NOT implemented in
+// Phase 4 - a pre-deployment check found AWS instance metadata (IMDS)
+// reachable from inside containers on this host (no IAM role currently
+// attached, but the hop-limit hardening that would block container access
+// isn't set). Granting real command execution inside instant-web would
+// have a live path to that exposure. See docs/CHALLENGES.md
+// "12 - Command Injection (deferred)". Its placeholder row (order_index
+// 12) is retained below, disabled, until this is resolved at the
+// AWS/infrastructure level (outside this repo) and the challenge is built
+// in a later phase.
+//
+// The remaining rows (14-18) are placeholders reserving slug/category/
+// points for later phases. Disabled, hidden from players.
 //
 // NOTE: Phase 1 seeded a different slug set (getting-started,
-// public-product-catalog, customer-auth, etc). Upgrading an existing Phase 1
-// deployment to Phase 2 should use `scripts/reset.sh`, not just
-// `scripts/seed.sh` - re-seeding alone leaves the old Phase 1 rows in place
-// as orphaned, still-enabled challenges since their slugs no longer appear
-// in this list.
+// public-product-catalog, customer-auth, etc), Phase 2 seeded placeholder
+// slugs for 06-10 (public-blog-metadata, customer-order-access,
+// customer-invoice-handling, employee-auth, employee-directory) that
+// Phase 3 replaced, and Phase 4 replaces the 11/13 placeholders
+// (employee-documents, employee-analytics) with the actual challenge
+// definitions below (different vulnerability classes than originally
+// placeholder-planned). Upgrading an existing deployment should use
+// `scripts/reset.sh`, not just `scripts/seed.sh` - re-seeding alone leaves
+// old rows in place as orphaned, still-disabled challenges since their
+// slugs no longer appear in this list.
 const CHALLENGES = [
   {
     slug: 'information-disclosure',
@@ -90,14 +106,101 @@ const CHALLENGES = [
     enabled: true,
     order_index: 5,
   },
-  { slug: 'public-blog-metadata', title: 'Blog Metadata Exposure', category: 'Public Website', difficulty: 'beginner', points: 50, order_index: 6 },
-  { slug: 'customer-order-access', title: 'Order Access Control', category: 'Customer Portal', difficulty: 'easy', points: 125, order_index: 7 },
-  { slug: 'customer-invoice-handling', title: 'Invoice Handling', category: 'Customer Portal', difficulty: 'medium', points: 150, order_index: 8 },
-  { slug: 'employee-auth', title: 'Employee Portal Authentication', category: 'Employee Portal', difficulty: 'easy', points: 125, order_index: 9 },
-  { slug: 'employee-directory', title: 'Employee Directory Exposure', category: 'Employee Portal', difficulty: 'medium', points: 150, order_index: 10 },
-  { slug: 'employee-documents', title: 'Document Handling', category: 'Employee Portal', difficulty: 'medium', points: 175, order_index: 11 },
+  {
+    slug: 'idor-invoice-access',
+    title: 'Invoice Access Control',
+    description:
+      'Your own account has invoices you can view any time. See how the ' +
+      "portal decides which invoice you're allowed to look at.",
+    category: 'Customer Portal',
+    difficulty: 'easy',
+    points: 100,
+    flag: config.flags.idor,
+    enabled: true,
+    order_index: 6,
+  },
+  {
+    slug: 'jwt-auth-weakness',
+    title: 'JWT Authentication Weakness',
+    description:
+      'Instant offers self-service API access tokens for the API Access ' +
+      'add-on. Take a close look at how those tokens are structured and verified.',
+    category: 'Customer Portal',
+    difficulty: 'easy',
+    points: 100,
+    flag: config.flags.jwt,
+    enabled: true,
+    order_index: 7,
+  },
+  {
+    slug: 'business-logic-flaw',
+    title: 'Business Logic Flaw',
+    description:
+      "Instant customers can redeem loyalty points for account credit. " +
+      'The redemption form trusts you more than you might expect.',
+    category: 'Customer Portal',
+    difficulty: 'medium',
+    points: 125,
+    flag: config.flags.businessLogic,
+    enabled: true,
+    order_index: 8,
+  },
+  {
+    slug: 'csrf-notification-settings',
+    title: 'Cross-Site Request Forgery',
+    description:
+      'Account preferences can be changed a couple of different ways at ' +
+      "Instant. Not every way gets the same protection as the settings form.",
+    category: 'Customer Portal',
+    difficulty: 'medium',
+    points: 125,
+    flag: config.flags.csrf,
+    enabled: true,
+    order_index: 9,
+  },
+  {
+    slug: 'unrestricted-file-upload',
+    title: 'Unrestricted File Upload',
+    description:
+      'Customers can upload a profile avatar. See what the upload form ' +
+      'actually checks about the file you send it.',
+    category: 'Customer Portal',
+    difficulty: 'medium',
+    points: 150,
+    flag: config.flags.fileUpload,
+    enabled: true,
+    order_index: 10,
+  },
+  {
+    slug: 'local-file-inclusion',
+    title: 'Local File Inclusion',
+    description:
+      'Invoices can be viewed as a formatted receipt in a few different ' +
+      'styles. Take a close look at how the receipt style is selected.',
+    category: 'Customer Portal',
+    difficulty: 'medium',
+    points: 175,
+    flag: config.flags.lfi,
+    enabled: true,
+    order_index: 11,
+  },
+  // Challenge 12 (Command Injection) is deferred, not implemented this
+  // phase - see docs/CHALLENGES.md "12 - Command Injection (deferred)".
+  // Reserved placeholder retained below, disabled, no real flag value.
   { slug: 'employee-file-upload', title: 'File Upload Handling', category: 'Employee Portal', difficulty: 'hard', points: 200, order_index: 12 },
-  { slug: 'employee-analytics', title: 'Analytics Dashboard', category: 'Employee Portal', difficulty: 'medium', points: 150, order_index: 13 },
+  {
+    slug: 'advanced-sql-injection',
+    title: 'Advanced SQL Injection',
+    description:
+      "Instant's public order tracker will tell you whether an order " +
+      "number and email match, nothing more. Sometimes that's already enough.",
+    category: 'Public Website',
+    difficulty: 'hard',
+    points: 250,
+    flag: config.flags.advancedSqli,
+    enabled: true,
+    order_index: 13,
+  },
   { slug: 'company-admin-access', title: 'Company Admin Access Control', category: 'Company Admin', difficulty: 'hard', points: 225, order_index: 14 },
   { slug: 'company-admin-users', title: 'Admin User Management', category: 'Company Admin', difficulty: 'hard', points: 225, order_index: 15 },
   { slug: 'internal-api-exposure', title: 'Internal API Exposure', category: 'Internal Services', difficulty: 'hard', points: 250, order_index: 16 },

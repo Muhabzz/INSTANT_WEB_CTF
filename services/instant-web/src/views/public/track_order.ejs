@@ -1,0 +1,23 @@
+<%- include('../partials/header', { title, navItems, brandSuffix }) %>
+
+<h1 class="mt-0">Track Your Order</h1>
+<div class="card" style="max-width:480px">
+  <p class="muted">Enter your order number and the email used at checkout.</p>
+  <form class="stacked" method="POST" action="/company/track-order">
+    <label for="order_id">Order number</label>
+    <input id="order_id" name="order_id" placeholder="e.g. 4" required>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required>
+    <button class="btn" type="submit">Check status</button>
+  </form>
+
+  <% if (submitted) { %>
+    <% if (found) { %>
+      <div class="alert success">We found a matching order.</div>
+    <% } else { %>
+      <div class="alert error">No matching order found for that number and email.</div>
+    <% } %>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

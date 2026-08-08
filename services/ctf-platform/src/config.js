@@ -42,5 +42,12 @@ module.exports = {
     pathTraversal: required('FLAG_PATH_TRAVERSAL'),
     authBypass: required('FLAG_AUTH_BYPASS'),
     xss: required('FLAG_XSS'),
+    idor: required('FLAG_IDOR'),
+    jwt: required('FLAG_JWT'),
+    businessLogic: required('FLAG_BUSINESS_LOGIC'),
+    csrf: required('FLAG_CSRF'),
+    fileUpload: required('FLAG_FILE_UPLOAD'),
+    lfi: required('FLAG_LFI'),
+    advancedSqli: required('FLAG_ADVANCED_SQLI'),
   },
 };

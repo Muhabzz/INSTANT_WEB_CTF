@@ -1,0 +1,50 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">API Tokens</h1>
+<div class="card" style="max-width:640px">
+  <p>
+    Generate a bearer token for the <strong>Instant API Access</strong> add-on
+    to call the Instant API directly from your own scripts.
+  </p>
+
+  <form method="POST" action="/company/portal/api-tokens/generate">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn" type="submit">Generate new token</button>
+  </form>
+
+  <% if (token) { %>
+    <div class="alert success" style="word-break:break-all; margin-top:1rem">
+      <strong>Your token (shown once):</strong><br>
+      <code><%= token %></code>
+    </div>
+    <h2>Example usage</h2>
+    <pre style="white-space:pre-wrap; word-break:break-all">curl -H "Authorization: Bearer <%= token %>" \
+  https://your-instant-host/company/api/account</pre>
+  <% } %>
+
+  <p class="muted" style="margin-top:1rem">
+    Tokens are valid for 2 hours and are scoped to read-only account access.
+  </p>
+
+  <h2>API reference</h2>
+  <table>
+    <thead><tr><th>Endpoint</th><th>Description</th><th>Required scope</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>GET /company/api/account</code></td>
+        <td>Read your own account profile.</td>
+        <td><code>account:read</code></td>
+      </tr>
+      <tr>
+        <td><code>GET /company/api/internal/diagnostics</code></td>
+        <td>Internal service diagnostics (ops/on-call use only - not part of the public API Access add-on).</td>
+        <td><code>admin:internal</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="muted" style="margin-top:0.5rem">
+    Self-service tokens generated above are always issued with <code>account:read</code> only.
+  </p>
+</div>
+
+<%- include('../partials/footer') %>

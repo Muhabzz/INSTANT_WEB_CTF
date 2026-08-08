@@ -7,7 +7,7 @@
     <tbody>
     <% invoices.forEach(i => { %>
       <tr>
-        <td><%= i.invoice_number %></td>
+        <td><a href="/company/portal/invoices/<%= i.id %>"><%= i.invoice_number %></a></td>
         <td><span class="pill <%= i.status %>"><%= i.status %></span></td>
         <td>$<%= (i.amount_cents / 100).toFixed(2) %></td>
         <td class="muted"><%= new Date(i.issued_at).toLocaleDateString() %></td>

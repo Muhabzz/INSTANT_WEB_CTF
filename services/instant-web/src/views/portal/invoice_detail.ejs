@@ -1,0 +1,20 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Invoice <%= invoice.invoice_number %></h1>
+<div class="card" style="max-width:480px">
+  <p><strong>Status:</strong> <span class="pill <%= invoice.status %>"><%= invoice.status %></span></p>
+  <p><strong>Amount:</strong> $<%= (invoice.amount_cents / 100).toFixed(2) %></p>
+  <p><strong>Issued:</strong> <%= new Date(invoice.issued_at).toLocaleDateString() %></p>
+  <% if (invoice.internal_memo) { %>
+    <div class="alert success"><strong>Internal memo:</strong> <%= invoice.internal_memo %></div>
+  <% } %>
+  <p>
+    <strong>Receipt:</strong>
+    <a href="/company/portal/invoices/<%= invoice.id %>/receipt?template=standard">Standard</a> ·
+    <a href="/company/portal/invoices/<%= invoice.id %>/receipt?template=detailed">Detailed</a> ·
+    <a href="/company/portal/invoices/<%= invoice.id %>/receipt?template=minimal">Minimal</a>
+  </p>
+  <p><a href="/company/portal/invoices">&larr; Back to invoices</a></p>
+</div>
+
+<%- include('../partials/footer') %>

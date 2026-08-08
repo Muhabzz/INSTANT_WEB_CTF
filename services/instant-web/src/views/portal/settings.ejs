@@ -4,7 +4,30 @@
 <div class="card" style="max-width:480px">
   <p><strong>Name:</strong> <%= companyUser.name %></p>
   <p><strong>Email:</strong> <%= companyUser.email %></p>
-  <p class="muted">Account settings management is not yet available in this build.</p>
+
+  <% if (csrfFlag) { %>
+    <div class="alert success">
+      <strong>Compliance notice:</strong> this preference was last changed via a
+      link-based request rather than this settings form.
+      Reference: <%= csrfFlag %>
+    </div>
+  <% } %>
+
+  <h2>Email notifications</h2>
+  <form class="stacked" method="POST" action="/company/portal/settings/notifications">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>
+      <input type="checkbox" name="email_notifications" <%= companyUser.email_notifications_enabled ? 'checked' : '' %>>
+      Send me account and billing emails
+    </label>
+    <button class="btn" type="submit">Save preference</button>
+  </form>
+
+  <p class="muted" style="margin-top:1rem">
+    Prefer not to log in? Every notification email we send includes a
+    one-click unsubscribe link in the footer, shaped like:<br>
+    <code>/company/portal/settings/quick-unsubscribe</code>
+  </p>
 </div>
 
 <%- include('../partials/footer') %>

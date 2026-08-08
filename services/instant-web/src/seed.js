@@ -17,15 +17,36 @@ const BLOG_POSTS = [
   { title: 'How We Think About Reliability', slug: 'how-we-think-about-reliability', author: 'Instant Engineering', content: 'A look at how the Instant platform team approaches uptime and incident response.' },
   { title: '5 Ways to Automate Your Workflow', slug: '5-ways-to-automate-your-workflow', author: 'Instant Team', content: 'Practical tips for getting more out of Instant automations.' },
   { title: 'Instant Named a Leader in SaaS Automation', slug: 'instant-named-a-leader', author: 'Instant Team', content: 'We are proud to be recognized in this year\'s industry report.' },
+  // Challenge 04 (Authentication Bypass) breadcrumb: a customer-spotlight
+  // guest post naming the seeded VIP account and its exact email, so the
+  // legacy-login bypass has a real, in-app way to learn WHICH account to
+  // target - not just that the bypass technique works. Guest/case-study
+  // posts with a named contact byline are a completely ordinary B2B SaaS
+  // marketing pattern; this one just happens to name the right person.
+  {
+    title: 'Customer Spotlight: How Meridian Capital Scaled Their Back Office',
+    slug: 'customer-spotlight-meridian-capital',
+    author: 'Alexandra Chen, Meridian Capital',
+    content:
+      'Enterprise renewals used to mean weeks of back-and-forth for our operations team. ' +
+      'Since moving onto Instant Enterprise, we have centralized every workflow our finance ' +
+      'and ops teams touch, and cut new-hire onboarding time in half. Instant\'s account team ' +
+      'has been a genuine partner throughout our renewal this year. ' +
+      '— Alexandra Chen, Head of Operations, Meridian Capital. ' +
+      'Questions about our enterprise rollout? Reach me directly at ' +
+      'alexandra.chen@meridiancapital.example.',
+  },
 ];
 
 async function seedCompanyUsers(client) {
   const customerHash = await bcrypt.hash(config.seed.customerPassword, 12);
   const employeeHash = await bcrypt.hash(config.seed.employeePassword, 12);
   const adminHash = await bcrypt.hash(config.seed.companyAdminPassword, 12);
-  // Random, never-communicated password - this account is never meant to be
-  // reached via a normal, correctly-guessed login (see challenge 04).
+  // Random, never-communicated passwords - these accounts are never meant
+  // to be reached via a normal, correctly-guessed login (see challenges 04
+  // and 06).
   const vipHash = await bcrypt.hash(require('crypto').randomBytes(24).toString('hex'), 12);
+  const idorTargetHash = await bcrypt.hash(require('crypto').randomBytes(24).toString('hex'), 12);
 
   const upsert = async (name, email, hash, role, department, notes) => {
     const { rows } = await client.query(
@@ -58,8 +79,27 @@ async function seedCompanyUsers(client) {
       `Internal tracking ref: ${config.flags.authBypass}`
   );
 
+  // Challenge 06 (IDOR) target account: an ordinary synthetic customer, no
+  // special credentials involved - the point is that ANY logged-in
+  // customer can view THIS account's invoice by id, not that this account
+  // itself is special or reachable via any auth flaw.
+  const idorTargetId = await upsert(
+    'Morgan Reyes',
+    'morgan.reyes@northstar-industries.example',
+    idorTargetHash,
+    'customer',
+    null
+  );
+
+  // Seed the demo customer with a starting loyalty point balance for
+  // challenge 08 (Business Logic). Ordinary, not itself sensitive.
+  await client.query(
+    `UPDATE company_users SET loyalty_points = 150 WHERE id = $1 AND loyalty_points = 0`,
+    [customerId]
+  );
+
   console.log('[seed] ensured customer/employee/admin company accounts exist');
-  return { customerId, employeeId, adminId };
+  return { customerId, employeeId, adminId, idorTargetId };
 }
 
 async function seedProducts(client) {
@@ -123,6 +163,58 @@ async function seedOrdersAndInvoices(client, customerId) {
   console.log(`[seed] created ${orderRows.length} demo orders + invoices`);
 }
 
+async function seedIdorTargetInvoice(client, idorTargetId) {
+  // Challenge 06 (IDOR) target row: an invoice belonging to the seeded
+  // "Morgan Reyes" account (see seedCompanyUsers), reachable by any
+  // authenticated customer who requests it by id via
+  // GET /company/portal/invoices/:id - see routes/portal.js. Never linked
+  // from that account's own pages to anyone but that account in normal use.
+  const { rows: existing } = await client.query(
+    'SELECT o.id FROM orders o WHERE o.customer_id = $1 LIMIT 1',
+    [idorTargetId]
+  );
+  if (existing.length > 0) return;
+
+  const { rows: orderRows } = await client.query(
+    `INSERT INTO orders (customer_id, status, total_cents) VALUES ($1,'paid',29900) RETURNING id`,
+    [idorTargetId]
+  );
+  const orderId = orderRows[0].id;
+
+  await client.query(
+    `INSERT INTO invoices (order_id, invoice_number, amount_cents, status, internal_memo)
+     VALUES ($1,$2,$3,'paid',$4)
+     ON CONFLICT (invoice_number) DO NOTHING`,
+    [
+      orderId,
+      `INV-2026-${String(orderId).padStart(4, '0')}`,
+      29900,
+      'Enterprise SLA credit approved by finance - do not share this memo ' +
+        `outside the billing team. Internal tracking ref: ${config.flags.idor}`,
+    ]
+  );
+  console.log('[seed] created IDOR-target invoice');
+}
+
+async function seedSupportEscalations(client) {
+  const { rows: existing } = await client.query('SELECT COUNT(*)::int AS n FROM support_escalations');
+  if (existing[0].n > 0) return;
+
+  // Challenge 13 (Advanced SQL Injection) target row: never read by any
+  // normal application feature - reachable only via the boolean-blind SQL
+  // injection in the public order-tracking lookup (see routes/public.js).
+  await client.query(
+    `INSERT INTO support_escalations (reference, escalation_note, priority) VALUES ($1,$2,$3)`,
+    [
+      'ESC-2026-0042',
+      'Meridian Capital renewal escalation - executive sponsor requested a ' +
+        `same-day callback. Internal tracking ref: ${config.flags.advancedSqli}`,
+      1,
+    ]
+  );
+  console.log('[seed] created support escalation record');
+}
+
 async function seedSupportTickets(client, customerId) {
   const { rows: existing } = await client.query(
     'SELECT COUNT(*)::int AS n FROM support_tickets WHERE customer_id = $1',
@@ -182,13 +274,15 @@ async function seed() {
   await runMigrations();
   const client = await pool.connect();
   try {
-    const { customerId, employeeId } = await seedCompanyUsers(client);
+    const { customerId, employeeId, idorTargetId } = await seedCompanyUsers(client);
     await seedProducts(client);
     await seedBlogPosts(client);
     await seedOrdersAndInvoices(client, customerId);
     await seedSupportTickets(client, customerId);
     await seedDocuments(client, employeeId);
     await seedInternalNotes(client);
+    await seedIdorTargetInvoice(client, idorTargetId);
+    await seedSupportEscalations(client);
   } finally {
     client.release();
   }

@@ -1,6 +1,9 @@
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const multer = require('multer');
 const rateLimit = require('express-rate-limit');
 const { query } = require('../db');
 const { customerAuth } = require('../middleware/portalAuth');
@@ -34,6 +37,8 @@ const NAV_AUTH = [
   { href: '/company/portal/invoices', label: 'Invoices' },
   { href: '/company/portal/documents', label: 'Documents' },
   { href: '/company/portal/support', label: 'Support' },
+  { href: '/company/portal/rewards', label: 'Rewards' },
+  { href: '/company/portal/api-tokens', label: 'API Tokens' },
   { href: '/company/portal/settings', label: 'Settings' },
 ];
 
@@ -68,6 +73,25 @@ router.post('/register', authLimiter, verifyCsrfToken, async (req, res, next) =>
     const { rows } = await query(
       `INSERT INTO company_users (name, email, password_hash, role) VALUES ($1,$2,$3,'customer') RETURNING id`,
       [name, email, passwordHash]
+    );
+    const newCustomerId = rows[0].id;
+
+    // Every new signup starts on the Starter plan, same as a real
+    // self-service SaaS trial - this gives every customer a real order and
+    // invoice of their own from day one (not just the one seeded demo
+    // account), so their own Invoices page has a real, clickable
+    // /invoices/:id link instead of an empty list. No internal_memo is set
+    // here - that stays specific to the challenge 06 target invoice.
+    const { rows: orderRows } = await query(
+      `INSERT INTO orders (customer_id, status, total_cents) VALUES ($1,'paid',2900) RETURNING id`,
+      [newCustomerId]
+    );
+    const starterOrderId = orderRows[0].id;
+    await query(
+      `INSERT INTO invoices (order_id, invoice_number, amount_cents, status)
+       VALUES ($1,$2,$3,'paid')
+       ON CONFLICT (invoice_number) DO NOTHING`,
+      [starterOrderId, `INV-2026-${String(starterOrderId).padStart(4, '0')}`, 2900]
     );
 
     req.session.regenerate((err) => {
@@ -187,7 +211,11 @@ router.get('/dashboard', customerAuth.requireAuth, async (req, res, next) => {
 });
 
 router.get('/profile', customerAuth.requireAuth, (req, res) => {
-  res.render('portal/profile', { title: 'Profile' });
+  res.render('portal/profile', {
+    title: 'Profile',
+    uploadError: null,
+    avatarFlag: req.companyUser.avatar_flagged ? config.flags.fileUpload : null,
+  });
 });
 
 router.get('/orders', customerAuth.requireAuth, async (req, res, next) => {
@@ -211,6 +239,100 @@ router.get('/invoices', customerAuth.requireAuth, async (req, res, next) => {
       [req.companyUser.id]
     );
     res.render('portal/invoices', { title: 'Invoices', invoices: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Challenge 06 (IDOR). Invoice ids are small sequential integers, visible
+// in the invoice list above (and in this route's own URL). Intended
+// restriction: only show an invoice belonging to the requesting customer.
+// Actual query below looks up the invoice by id alone - it never joins
+// back to orders.customer_id to check ownership, so any authenticated
+// customer can view any other customer's invoice (including its
+// internal_memo) just by changing the id in the URL. This is a missing
+// authorization check, not a missing authentication check - the request is
+// fully logged-in the whole time.
+router.get('/invoices/:id', customerAuth.requireAuth, async (req, res, next) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) {
+    return res.status(404).render('error', { title: 'Not Found', message: 'Invoice not found.' });
+  }
+  try {
+    const { rows } = await query(
+      `SELECT i.id, i.invoice_number, i.amount_cents, i.status, i.issued_at, i.internal_memo
+       FROM invoices i WHERE i.id = $1`,
+      [id]
+    );
+    const invoice = rows[0];
+    if (!invoice) {
+      return res.status(404).render('error', { title: 'Not Found', message: 'Invoice not found.' });
+    }
+    res.render('portal/invoice_detail', { title: `Invoice ${invoice.invoice_number}`, invoice });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const RECEIPT_TEMPLATE_DENYLIST = /\/proc\/|\/etc\/shadow|\.ssh\/|docker\.sock/i;
+
+// Challenge 11 (LFI). Receipts can be previewed in a few styles
+// (standard/detailed/minimal) - the `template` param is meant to only ever
+// select one of the .txt files in challengeData.receiptTemplatesDir.
+// Ownership of the invoice itself IS checked correctly below (unlike
+// challenge 06, this route is not also an IDOR) - the vulnerability is
+// isolated to how the template file is located.
+router.get('/invoices/:id/receipt', customerAuth.requireAuth, async (req, res, next) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) {
+    return res.status(404).render('error', { title: 'Not Found', message: 'Invoice not found.' });
+  }
+  try {
+    const { rows } = await query(
+      `SELECT i.id, i.invoice_number, i.amount_cents, i.status
+       FROM invoices i JOIN orders o ON o.id = i.order_id
+       WHERE i.id = $1 AND o.customer_id = $2`,
+      [id, req.companyUser.id]
+    );
+    const invoice = rows[0];
+    if (!invoice) {
+      return res.status(404).render('error', { title: 'Not Found', message: 'Invoice not found.' });
+    }
+
+    const requestedTemplate = (req.query.template || 'standard').toString();
+    const requestedPath = requestedTemplate.endsWith('.txt') ? requestedTemplate : `${requestedTemplate}.txt`;
+
+    // Patched after an earlier pentest finding that flagged a couple of
+    // obviously dangerous paths - doesn't address the underlying issue
+    // below, which is that there is no containment/allowlist check at all.
+    if (RECEIPT_TEMPLATE_DENYLIST.test(requestedPath)) {
+      return res.status(400).render('error', { title: 'Invalid Request', message: 'That template is not valid.' });
+    }
+
+    // BUG: path.resolve() treats an absolute-path second argument as an
+    // anchor that DISCARDS the base directory entirely (e.g.
+    // path.resolve('/app/challenge-data/receipt-templates', '/etc/passwd')
+    // === '/etc/passwd'), and relative `../` segments are never blocked
+    // either since there is no `startsWith(receiptTemplatesDir)` check like
+    // challenge 03 has. Both an absolute path and `../` traversal reach
+    // outside receiptTemplatesDir - but since a `.txt` suffix is enforced
+    // above whenever the caller doesn't already supply one, this stays
+    // bounded to files that happen to end in `.txt` (which is exactly why
+    // the challenge 11 target file is named `notes.txt`, not something
+    // that would collide with a sensitive path like `/etc/shadow` or
+    // `/proc/self/environ`, neither of which end in `.txt`).
+    const resolved = path.resolve(config.challengeData.receiptTemplatesDir, requestedPath);
+
+    fs.readFile(resolved, 'utf8', (err, template) => {
+      if (err) {
+        return res.status(404).render('error', { title: 'Not Found', message: 'Receipt template not found.' });
+      }
+      const rendered = template
+        .replace(/{{invoice_number}}/g, invoice.invoice_number)
+        .replace(/{{amount}}/g, `$${(invoice.amount_cents / 100).toFixed(2)}`)
+        .replace(/{{status}}/g, invoice.status);
+      res.type('text/plain').send(rendered);
+    });
   } catch (err) {
     next(err);
   }
@@ -302,7 +424,203 @@ router.post('/support', customerAuth.requireAuth, verifyCsrfToken, async (req, r
 });
 
 router.get('/settings', customerAuth.requireAuth, (req, res) => {
-  res.render('portal/settings', { title: 'Settings' });
+  res.render('portal/settings', {
+    title: 'Settings',
+    // Challenge 09 (CSRF). Shown only when this account's notification
+    // preference was last changed via the unprotected legacy link path
+    // below, rather than through this CSRF-protected form - proof the
+    // state change happened without the form's synchronizer token.
+    csrfFlag: req.companyUser.notification_pref_source === 'email_link' ? config.flags.csrf : null,
+  });
+});
+
+router.post('/settings/notifications', customerAuth.requireAuth, verifyCsrfToken, async (req, res, next) => {
+  const enabled = req.body.email_notifications === 'on';
+  try {
+    await query(
+      `UPDATE company_users SET email_notifications_enabled = $1, notification_pref_source = 'settings_form' WHERE id = $2`,
+      [enabled, req.companyUser.id]
+    );
+    logger.info('notification_pref_updated', { userId: req.companyUser.id, source: 'settings_form' });
+    res.redirect('/company/portal/settings');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Challenge 09 (CSRF). A one-click "unsubscribe from emails" link, the kind
+// many transactional-email footers use so a recipient doesn't have to log
+// in just to opt out. Realistic in isolation, but state-changing GET
+// requests can't carry the synchronizer-token protection every POST form
+// in this app uses (see middleware/csrf.js) - so this route intentionally
+// has none, and mutates account state anyway. Any page (or bare <img>/
+// <a> tag) that causes a logged-in customer's browser to load this URL
+// changes their preference, no form submission or token required.
+// Referenced from robots.txt (see routes/public.js) and from the settings
+// page's own "email footer preview", same discovery pattern as challenges
+// 01 and 04.
+router.get('/settings/quick-unsubscribe', customerAuth.requireAuth, async (req, res, next) => {
+  try {
+    await query(
+      `UPDATE company_users SET email_notifications_enabled = FALSE, notification_pref_source = 'email_link' WHERE id = $1`,
+      [req.companyUser.id]
+    );
+    logger.info('notification_pref_updated', { userId: req.companyUser.id, source: 'email_link' });
+    res.render('portal/unsubscribed', { title: 'Unsubscribed' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Challenge 08 (Business Logic). Loyalty points, redeemable for account
+// credit. Intended business rule: a redemption must be a positive amount
+// no larger than the current balance. See the POST handler below for what
+// actually gets checked.
+const LOYALTY_TIER_THRESHOLD = 100000;
+
+router.get('/rewards', customerAuth.requireAuth, (req, res) => {
+  res.render('portal/rewards', {
+    title: 'Rewards',
+    balance: req.companyUser.loyalty_points,
+    unlocked: req.companyUser.loyalty_points >= LOYALTY_TIER_THRESHOLD,
+    flag: req.companyUser.loyalty_points >= LOYALTY_TIER_THRESHOLD ? config.flags.businessLogic : null,
+    formError: null,
+  });
+});
+
+router.post('/rewards/redeem', customerAuth.requireAuth, verifyCsrfToken, async (req, res, next) => {
+  const points = parseInt(req.body.points, 10);
+  const balance = req.companyUser.loyalty_points;
+
+  // Bug: only checks the redemption doesn't exceed the current balance.
+  // Never checks that `points` is positive, so a negative redemption
+  // passes the `points > balance` check (any negative number is less than
+  // a non-negative balance) and then *increases* the balance below, since
+  // subtracting a negative number is addition.
+  if (!Number.isInteger(points) || points > balance) {
+    return res.status(400).render('portal/rewards', {
+      title: 'Rewards',
+      balance,
+      unlocked: balance >= LOYALTY_TIER_THRESHOLD,
+      flag: balance >= LOYALTY_TIER_THRESHOLD ? config.flags.businessLogic : null,
+      formError: 'Enter a whole number of points, up to your current balance.',
+    });
+  }
+
+  try {
+    await query('UPDATE company_users SET loyalty_points = loyalty_points - $1 WHERE id = $2', [
+      points,
+      req.companyUser.id,
+    ]);
+    logger.info('loyalty_points_redeemed', { userId: req.companyUser.id, points });
+    res.redirect('/company/portal/rewards');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Challenge 07 (JWT Authentication Weakness). Self-service API token
+// generation for the "Instant API Access" add-on (see the public product
+// catalog). Tokens are signed HS256 and only ever issued with
+// `scope: "account:read"` - see routes/api.js for the verification side
+// and its deliberate weakness.
+router.get('/api-tokens', customerAuth.requireAuth, (req, res) => {
+  res.render('portal/api_tokens', { title: 'API Tokens', token: null });
+});
+
+router.post('/api-tokens/generate', customerAuth.requireAuth, verifyCsrfToken, (req, res) => {
+  const token = jwt.sign(
+    { sub: req.companyUser.id, email: req.companyUser.email, scope: 'account:read' },
+    config.apiJwtSecret,
+    { algorithm: 'HS256', expiresIn: '2h' }
+  );
+  logger.info('api_token_issued', { userId: req.companyUser.id });
+  res.render('portal/api_tokens', { title: 'API Tokens', token });
+});
+
+// Challenge 10 (Unrestricted File Upload). Profile avatar upload. Weak
+// validation: only the multipart part's declared Content-Type is checked
+// against an image allowlist - that value is attacker-controlled and isn't
+// verified against the file's actual bytes. Stored file keeps only its
+// extension from the client-supplied name (traversal-safe: path.extname
+// never contains a path separator), under challenge-data/uploads/, which
+// is created fresh at container startup (src/index.js) and is never a host
+// bind mount.
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, config.challengeData.uploadsDir),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).slice(0, 10).replace(/[^a-zA-Z0-9.]/g, '') || '.dat';
+      cb(null, `avatar-${req.companyUser.id}-${Date.now()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/png', 'image/jpeg', 'image/gif'];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error('Only PNG, JPEG, or GIF images are allowed.'));
+    }
+    cb(null, true);
+  },
+});
+
+const IMAGE_MAGIC_BYTES = [
+  Buffer.from([0x89, 0x50, 0x4e, 0x47]), // PNG
+  Buffer.from([0xff, 0xd8, 0xff]), // JPEG
+  Buffer.from([0x47, 0x49, 0x46, 0x38]), // GIF87a/GIF89a
+];
+
+function looksLikeRealImage(buf) {
+  return IMAGE_MAGIC_BYTES.some((sig) => buf.length >= sig.length && buf.subarray(0, sig.length).equals(sig));
+}
+
+router.post('/profile/avatar', customerAuth.requireAuth, (req, res, next) => {
+  const avatarFlag = req.companyUser.avatar_flagged ? config.flags.fileUpload : null;
+  avatarUpload.single('avatar')(req, res, (uploadErr) => {
+    if (uploadErr) {
+      return res.status(400).render('portal/profile', { title: 'Profile', uploadError: uploadErr.message, avatarFlag });
+    }
+    verifyCsrfToken(req, res, () => {
+      if (!req.file) {
+        return res.status(400).render('portal/profile', { title: 'Profile', uploadError: 'Please choose a file.', avatarFlag });
+      }
+      // Automated content scanner, same narrative device as the support
+      // ticket scanner in challenge 05: the declared type claimed an
+      // image, but the file's own bytes say otherwise.
+      let flagged = false;
+      try {
+        const buf = fs.readFileSync(req.file.path);
+        flagged = !looksLikeRealImage(buf);
+      } catch (err) {
+        return next(err);
+      }
+      query(
+        `UPDATE company_users SET avatar_filename = $1, avatar_flagged = $2 WHERE id = $3`,
+        [req.file.filename, flagged, req.companyUser.id]
+      )
+        .then(() => {
+          logger.info('avatar_uploaded', { userId: req.companyUser.id, flagged });
+          res.redirect('/company/portal/profile');
+        })
+        .catch(next);
+    });
+  });
+});
+
+// Serves uploaded avatars back. Restricted to challengeData.uploadsDir
+// itself (unlike challenge 03, this containment check is correct) - the
+// point of challenge 10 is the upload-time type check, not a second path
+// traversal bug here.
+router.get('/uploads/:filename', customerAuth.requireAuth, (req, res) => {
+  const resolved = path.resolve(config.challengeData.uploadsDir, req.params.filename);
+  if (!resolved.startsWith(config.challengeData.uploadsDir + path.sep)) {
+    return res.status(400).render('error', { title: 'Invalid Request', message: 'That file is not valid.' });
+  }
+  res.sendFile(resolved, (err) => {
+    if (err) {
+      res.status(404).render('error', { title: 'Not Found', message: 'File not found.' });
+    }
+  });
 });
 
 module.exports = router;

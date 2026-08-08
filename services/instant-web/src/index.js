@@ -11,6 +11,7 @@ const publicRoutes = require('./routes/public');
 const portalRoutes = require('./routes/portal');
 const employeeRoutes = require('./routes/employee');
 const adminRoutes = require('./routes/admin');
+const apiRoutes = require('./routes/api');
 
 const app = express();
 
@@ -42,6 +43,10 @@ app.use('/company', publicRoutes);
 app.use('/company/portal', portalRoutes);
 app.use('/company/employee', employeeRoutes);
 app.use('/company/admin', adminRoutes);
+// Instant's customer-facing API (challenge 07) - bearer-token auth via its
+// own JWT verification, entirely separate from every portal's cookie
+// session middleware above.
+app.use('/company/api', apiRoutes);
 
 app.use((req, res) => {
   res.status(404).render('error', { title: 'Not Found', message: 'Page not found.' });
@@ -63,6 +68,33 @@ function writeChallengeFiles() {
   fs.writeFileSync(
     path.join(config.challengeData.protectedDir, 'flag.txt'),
     `${config.flags.pathTraversal}\n`
+  );
+
+  // Challenge 10 (Unrestricted File Upload) target directory - customer
+  // avatar uploads land here (see routes/portal.js). Created fresh at
+  // startup; container-local only, never a host bind mount.
+  fs.mkdirSync(config.challengeData.uploadsDir, { recursive: true });
+
+  // Challenge 11 (LFI) intended templates - the receipt viewer (see
+  // routes/portal.js) is meant to only ever load one of these.
+  fs.mkdirSync(config.challengeData.receiptTemplatesDir, { recursive: true });
+  const templates = {
+    'standard.txt': 'INSTANT RECEIPT\n----------------\nInvoice: {{invoice_number}}\nAmount: {{amount}}\nStatus: {{status}}\n',
+    'detailed.txt': 'INSTANT — DETAILED RECEIPT\n==========================\nInvoice number: {{invoice_number}}\nAmount charged: {{amount}}\nCurrent status: {{status}}\nThank you for your business.\n',
+    'minimal.txt': '{{invoice_number}} | {{amount}} | {{status}}\n',
+  };
+  for (const [name, contents] of Object.entries(templates)) {
+    fs.writeFileSync(path.join(config.challengeData.receiptTemplatesDir, name), contents);
+  }
+
+  // Challenge 11 (LFI) target file - deliberately outside
+  // receiptTemplatesDir, reachable only through the vulnerable template
+  // selection in routes/portal.js. Never a host bind mount.
+  fs.mkdirSync(config.challengeData.internalBillingDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(config.challengeData.internalBillingDir, 'notes.txt'),
+    'Escalation queue notes - Meridian Capital renewal at risk, handle ' +
+      `before Friday. Internal tracking ref: ${config.flags.lfi}\n`
   );
 }
 
