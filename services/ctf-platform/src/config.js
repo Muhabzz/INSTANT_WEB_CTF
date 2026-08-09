@@ -49,5 +49,11 @@ module.exports = {
     fileUpload: required('FLAG_FILE_UPLOAD'),
     lfi: required('FLAG_LFI'),
     advancedSqli: required('FLAG_ADVANCED_SQLI'),
+    ssrf: required('FLAG_SSRF'),
+    openRedirect: required('FLAG_OPEN_REDIRECT'),
+    cors: required('FLAG_CORS'),
+    rfi: required('FLAG_RFI'),
+    chainedAttack: required('FLAG_CHAINED_ATTACK'),
+    raceCondition: required('FLAG_RACE_CONDITION'),
   },
 };

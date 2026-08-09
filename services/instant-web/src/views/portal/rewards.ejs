@@ -29,4 +29,28 @@
   </div>
 </div>
 
+<%
+  const bc = typeof bonusClaims !== 'undefined' ? bonusClaims : (companyUser.welcome_bonus_claims || 0);
+  const bErr = typeof bonusError !== 'undefined' ? bonusError : null;
+  const rFlag = typeof raceFlag !== 'undefined' ? raceFlag : null;
+%>
+<div class="card" style="margin-top:24px; max-width:480px">
+  <h2 class="mt-0">Welcome Bonus</h2>
+  <p class="muted">New accounts can claim a one-time 500 point welcome bonus.</p>
+  <% if (bErr) { %><div class="alert error"><%= bErr %></div><% } %>
+  <% if (bc > 0) { %>
+    <p class="muted">You've already claimed your welcome bonus.</p>
+  <% } else { %>
+    <form method="POST" action="/company/portal/rewards/claim-bonus">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn" type="submit">Claim Welcome Bonus</button>
+    </form>
+  <% } %>
+  <% if (rFlag) { %>
+    <div class="alert success" style="margin-top:1rem">
+      <strong>Bonus claim anomaly detected.</strong> Reference: <%= rFlag %>
+    </div>
+  <% } %>
+</div>
+
 <%- include('../partials/footer') %>

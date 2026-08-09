@@ -88,6 +88,12 @@ services:
       FLAG_FILE_UPLOAD: ${FLAG_FILE_UPLOAD}
       FLAG_LFI: ${FLAG_LFI}
       FLAG_ADVANCED_SQLI: ${FLAG_ADVANCED_SQLI}
+      FLAG_SSRF: ${FLAG_SSRF}
+      FLAG_OPEN_REDIRECT: ${FLAG_OPEN_REDIRECT}
+      FLAG_CORS: ${FLAG_CORS}
+      FLAG_RFI: ${FLAG_RFI}
+      FLAG_CHAINED_ATTACK: ${FLAG_CHAINED_ATTACK}
+      FLAG_RACE_CONDITION: ${FLAG_RACE_CONDITION}
     networks:
       - app
       - db
@@ -136,6 +142,12 @@ services:
       FLAG_FILE_UPLOAD: ${FLAG_FILE_UPLOAD}
       FLAG_LFI: ${FLAG_LFI}
       FLAG_ADVANCED_SQLI: ${FLAG_ADVANCED_SQLI}
+      FLAG_SSRF: ${FLAG_SSRF}
+      FLAG_OPEN_REDIRECT: ${FLAG_OPEN_REDIRECT}
+      FLAG_CORS: ${FLAG_CORS}
+      FLAG_RFI: ${FLAG_RFI}
+      FLAG_CHAINED_ATTACK: ${FLAG_CHAINED_ATTACK}
+      FLAG_RACE_CONDITION: ${FLAG_RACE_CONDITION}
     networks:
       - app
       - db
@@ -189,6 +201,11 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV}
       INFRA_SERVICE_PORT: ${INFRA_SERVICE_PORT}
+      # Challenges 14 (SSRF) and 17 (RFI) - see src/index.js. This service
+      # has no config.js wrapper (unlike instant-web/ctf-platform); it
+      # reads these directly from process.env.
+      FLAG_SSRF: ${FLAG_SSRF}
+      FLAG_RFI: ${FLAG_RFI}
     networks:
       - internal
     # No published ports, no DB access, internal network only.

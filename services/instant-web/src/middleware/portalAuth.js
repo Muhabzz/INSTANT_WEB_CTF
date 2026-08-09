@@ -32,7 +32,7 @@ function buildPortalAuth({ role, cookieName, cookiePath, secret, tableName }) {
         const { rows } = await query(
           `SELECT id, name, email, role, department, notes, created_at,
                   loyalty_points, email_notifications_enabled, notification_pref_source,
-                  avatar_filename, avatar_flagged
+                  avatar_filename, avatar_flagged, welcome_bonus_claims
            FROM company_users WHERE id = $1 AND role = $2`,
           [req.session.userId, role]
         );

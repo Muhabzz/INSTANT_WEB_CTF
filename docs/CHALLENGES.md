@@ -4,40 +4,38 @@
 > exploitation paths for every implemented challenge. Never surface this
 > file, or its contents, to players. It is not linked from any in-app page.
 
-## Phase 4 status
+## Phase 6 status
 
-Challenges 01-11 and 13 are fully implemented, enabled, and live inside the
-Instant company application (`services/instant-web`). The remaining rows
-(12, 14-18) are placeholders: slug/category/points/order reserved in the
-database, `enabled = false`, no real vulnerable implementation yet.
+Challenges 01-18 are all fully implemented, enabled, and live inside the
+Instant company application (`services/instant-web`), plus small, sandboxed
+additions to `infra-service` for challenges 14 and 17.
 
-**Challenge 12 (Command Injection) was deliberately deferred, not skipped
-by omission.** See "12 — Command Injection (deferred)" below for the full
-finding. In short: a pre-implementation check found AWS instance metadata
-(IMDS) reachable over HTTP from inside `instant-web` (and, by the same
-Docker networking, every other container on this host) — the full IMDSv2
-token flow succeeds. No IAM role happens to be attached to this EC2
-instance today, so there are no instance-role credentials to steal right
-now, but granting genuine command execution inside a container on this
-host would have a live path to that endpoint regardless. This is an
-EC2/AWS-side configuration issue (the metadata hop-limit hardening,
-`--http-put-response-hop-limit 1`, isn't set) — not something fixable by
-editing application code or `docker-compose.yml` in this repo. Per explicit
-project instructions to stop and report rather than silently work around
-this class of finding, challenge 12 was left unimplemented this phase.
+**Challenge 12 was originally reserved for Command Injection, which was
+never implemented** — a pre-implementation check found AWS instance
+metadata (IMDS) reachable over HTTP from inside `instant-web` (and, by the
+same Docker networking, every other container on this host); the full
+IMDSv2 token flow succeeds, and granting genuine command execution inside
+a container on this host would have had a live path to that endpoint. This
+was an EC2/AWS-side configuration issue, not something fixable by editing
+application code in this repo, so per instruction the slot was replaced
+outright with a Race Condition challenge instead (see "12 — Race
+Condition" below) rather than implementing command execution. Command
+Injection remains unimplemented anywhere in this project.
 
 **Upgrading an existing prior-phase deployment:** Phase 1 seeded a
 different slug set (`getting-started`, `public-product-catalog`,
 `customer-auth`, etc), Phase 2 seeded placeholder slugs for 06-10
 (`public-blog-metadata`, `customer-order-access`,
-`customer-invoice-handling`, `employee-auth`, `employee-directory`), and
-Phase 4 seeded placeholder slugs for 11 and 13 (`employee-documents`,
-`employee-analytics`) that each subsequent phase replaces outright with
-the challenges documented below — different vulnerability classes than
-those placeholders originally reserved. Use `scripts/reset.sh`, not just
-`scripts/seed.sh` — reseeding alone leaves old rows in place as orphaned,
-still-disabled challenges, since their slugs no longer appear in the
-current seed list.
+`customer-invoice-handling`, `employee-auth`, `employee-directory`), Phase
+4 seeded placeholder slugs for 11 and 13 (`employee-documents`,
+`employee-analytics`), and Phase 5 seeded placeholder slugs for 14-18
+(`company-admin-access`, `company-admin-users`, `internal-api-exposure`,
+`template-service-rendering`, `full-chain-compromise`) that each
+subsequent phase replaces outright with the challenges documented below —
+different vulnerability classes than those placeholders originally
+reserved. Use `scripts/reset.sh`, not just `scripts/seed.sh` — reseeding
+alone leaves old rows in place as orphaned, still-disabled challenges,
+since their slugs no longer appear in the current seed list.
 
 An admin can enable/disable any challenge from **Admin → Challenges** in the
 CTF platform at any time; disabled challenges are hidden from players.
@@ -60,23 +58,23 @@ and scoring on the CTF platform side is gated.
 | 9 | `csrf-notification-settings` | Cross-Site Request Forgery | Customer Portal | medium | 125 | **Enabled** |
 | 10 | `unrestricted-file-upload` | Unrestricted File Upload | Customer Portal | medium | 150 | **Enabled** |
 | 11 | `local-file-inclusion` | Local File Inclusion | Customer Portal | medium | 175 | **Enabled** |
-| 12 | `employee-file-upload` | *(placeholder — intended: Command Injection)* | Employee Portal | hard | 200 | Reserved — deferred, see above |
+| 12 | `race-condition-bonus-claim` | Race Condition | Customer Portal | medium | 200 | **Enabled** |
 | 13 | `advanced-sql-injection` | Advanced SQL Injection | Public Website | hard | 250 | **Enabled** |
-| 14 | `company-admin-access` | Company Admin Access Control | Company Admin | hard | 225 | Reserved |
-| 15 | `company-admin-users` | Admin User Management | Company Admin | hard | 225 | Reserved |
-| 16 | `internal-api-exposure` | Internal API Exposure | Internal Services | hard | 250 | Reserved |
-| 17 | `template-service-rendering` | Template Rendering | Internal Services | advanced | 275 | Reserved |
-| 18 | `full-chain-compromise` | Full Chain: Company Compromise | Attack Chain | advanced | 400 | Reserved |
+| 14 | `ssrf` | Server-Side Request Forgery | Customer Portal | medium | 200 | **Enabled** |
+| 15 | `open-redirect` | Open Redirect | Public Website | easy | 125 | **Enabled** |
+| 16 | `cors-misconfiguration` | CORS Misconfiguration | Customer Portal | medium | 200 | **Enabled** |
+| 17 | `remote-file-inclusion` | Remote File Inclusion | Customer Portal | hard | 275 | **Enabled** |
+| 18 | `chained-attack` | Chained Web Attack | Attack Chain | advanced | 400 | **Enabled** |
 
-Total: 18 challenges (12 implemented and enabled, 1 deferred, 5 reserved).
-Flag plaintext values live in `.env` (`FLAG_INFO_DISCLOSURE`,
-`FLAG_SQL_INJECTION`, `FLAG_PATH_TRAVERSAL`, `FLAG_AUTH_BYPASS`, `FLAG_XSS`,
-`FLAG_IDOR`, `FLAG_JWT`, `FLAG_BUSINESS_LOGIC`, `FLAG_CSRF`,
-`FLAG_FILE_UPLOAD`, `FLAG_LFI`, `FLAG_ADVANCED_SQLI`) — the single source of
+Total: 18 challenges, all implemented and enabled. Flag plaintext values
+live in `.env` (`FLAG_INFO_DISCLOSURE`, `FLAG_SQL_INJECTION`,
+`FLAG_PATH_TRAVERSAL`, `FLAG_AUTH_BYPASS`, `FLAG_XSS`, `FLAG_IDOR`,
+`FLAG_JWT`, `FLAG_BUSINESS_LOGIC`, `FLAG_CSRF`, `FLAG_FILE_UPLOAD`,
+`FLAG_LFI`, `FLAG_ADVANCED_SQLI`, `FLAG_SSRF`, `FLAG_OPEN_REDIRECT`,
+`FLAG_CORS`, `FLAG_RFI`, `FLAG_CHAINED_ATTACK`, `FLAG_RACE_CONDITION`) — the
+single source of
 truth, read by both `ctf-platform` (hashed into `challenges.flag_hash` at
 seed time) and `instant-web` (embedded at each vulnerable location).
-Reserved/deferred challenges (12, 14-18) currently seed with no real flag
-value.
 
 ---
 
@@ -527,60 +525,82 @@ provide any flag beyond `FLAG_FILE_UPLOAD` itself.
 
 **Isolation:** Fully contained to `instant-web`'s own container filesystem — `challenge-data/` is `COPY`'d into the image and `challenge-data/internal-billing/`, like every other challenge-data subdirectory, is never a host bind mount. No code execution, template engine, or `require()` of file contents is involved anywhere in this path — it is a pure `fs.readFile` returning raw text. The mandatory `.txt` suffix (appended whenever the caller's input doesn't already end in `.txt`) is a genuine, load-bearing safety property here, not just a cosmetic detail: it prevents this from reaching any of the specific paths called out as off-limits for this challenge (`/etc/shadow`, SSH keys, `/proc/self/environ` and other `/proc` entries, a Docker socket path, `.env`) because none of those paths end in `.txt`. A player who already supplies a `.txt`-suffixed absolute path is still bounded to whatever the container's own filesystem contains under that path — there is no host filesystem for it to reach in the first place (no host bind mounts anywhere in `instant-web`'s service definition).
 
-**Known limitations:** This is a narrower LFI than a fully unbounded one deliberately — an unrestricted version would have been able to reach `/proc/self/environ` (which would leak every flag value and the live `COMPANY_DB_PASSWORD`/`COMPANY_API_JWT_SECRET`/session secrets in this container's environment, not just `FLAG_LFI`) and other genuinely sensitive in-container paths. Constraining reachable targets to `.txt`-suffixed files is what keeps this a clean, single-flag LFI challenge instead of a full environment-variable disclosure bug; see "12 — Command Injection (deferred)" below for the closely related finding that motivated being conservative here.
+**Known limitations:** This is a narrower LFI than a fully unbounded one deliberately — an unrestricted version would have been able to reach `/proc/self/environ` (which would leak every flag value and the live `COMPANY_DB_PASSWORD`/`COMPANY_API_JWT_SECRET`/session secrets in this container's environment, not just `FLAG_LFI`) and other genuinely sensitive in-container paths. Constraining reachable targets to `.txt`-suffixed files is what keeps this a clean, single-flag LFI challenge instead of a full environment-variable disclosure bug — this caution was originally motivated by the AWS IMDS reachability finding that led to Command Injection being replaced by challenge 12's current Race Condition design (see "12 — Race Condition" below).
 
 ---
 
-## 12 — Command Injection (deferred)
+## 12 — Race Condition
 
-**Status: NOT implemented this phase.** No route, no flag, no schema
-change. The placeholder challenge row (`employee-file-upload`, order_index
-12) is unchanged from Phase 3/earlier and remains `enabled = false`.
+- **Difficulty / Points:** Medium / 200
+- **Affected route:** `POST /company/portal/rewards/claim-bonus`
+- **Vulnerability type:** Race condition — unsynchronized check-then-act on a one-time claim, no transaction, no row lock, no atomic compare-and-swap.
+- **Source:** `services/instant-web/src/routes/portal.js`, `services/instant-web/src/views/portal/rewards.ejs`, `services/instant-web/migrations/0007_challenge12_race_condition.sql`
 
-**Why:** Before writing any code for this challenge, a preflight check was
-run against the already-running `instant-web` container (no application
-changes involved — this is the container as it already existed) to confirm
-AWS instance metadata (IMDS) is not reachable, since granting real command
-execution inside a container with a live path to IMDS would risk exposing
-real AWS credentials through a training platform. The check found:
+**Note on history:** This slot originally reserved Command Injection (see
+prior revisions of this file). That design was found to have a live path
+to AWS instance metadata (IMDS reachable from containers on this host,
+documented in earlier phase reports) and was never implemented. Per
+instruction, the slot was replaced outright with this Race Condition
+challenge instead — a different vulnerability class, not a variant of the
+original plan. Command Injection remains unimplemented in this project.
 
-1. `GET http://169.254.169.254/latest/meta-data/` from inside the
-   container returns a live HTTP 401 (IMDSv2 token required) — not a
-   timeout or connection-refused, meaning the request reaches the
-   metadata service.
-2. The full IMDSv2 flow succeeds: `PUT /latest/api/token` returns a valid
-   session token, and that token can be used for subsequent metadata
-   queries.
-3. `GET /latest/meta-data/iam/security-credentials/` with that token
-   returned 404 — **this specific EC2 host currently has no IAM instance
-   role attached**, so there are no instance-role credentials to steal
-   today. That is incidental to the current AWS console configuration,
-   not a control this platform (or Docker) enforces.
+**Intended discovery:** The existing Rewards page (see challenge 08) gains
+a new "Welcome Bonus" card: any account can claim a one-time 500-point
+signup bonus. The button and its one-shot framing ("New accounts can claim
+a one-time... bonus") is the standard trigger for a security-minded player
+to wonder what happens under concurrent/rapid submission — the same
+instinct that applies to any real "claim once" or "redeem code" feature.
 
-The standard mitigation — `--http-put-response-hop-limit 1` on the EC2
-instance's metadata options, which causes the extra network hop through
-Docker's bridge/NAT to drop the packet — is not set on this host. This is
-an AWS/infrastructure-level setting, not something expressible in
-`docker-compose.yml`, a `Dockerfile`, or application code in this repo.
-Adding an in-container workaround (e.g. `iptables` rules blocking
-169.254.169.254) would itself require the `NET_ADMIN` capability, which
-would weaken this project's `cap_drop: [ALL]` posture to build a
-"fix" for a problem that isn't this repo's to fix — a worse trade than
-simply not implementing the challenge yet.
+**Intended exploitation:** The handler does `SELECT welcome_bonus_claims`
+(the check), waits roughly 400ms (framed as a fraud-check lookup — a
+realistic reason a claim endpoint would pause, and what widens the race
+window enough to demonstrate reliably with ordinary concurrent tooling
+rather than requiring sub-millisecond timing), then — if the check showed
+zero prior claims — runs an unconditional
+`UPDATE ... SET welcome_bonus_claims = welcome_bonus_claims + 1`. There is
+no transaction wrapping the two steps, no `SELECT ... FOR UPDATE` row
+lock, and the `UPDATE` is not a compare-and-swap
+(`WHERE welcome_bonus_claims = 0`). Firing many genuinely concurrent
+requests with the same session (e.g. backgrounded `curl` processes, or
+Burp Repeater/Turbo Intruder's parallel send) lets every request's check
+read the same pre-write value during the delay window, so every one of
+them proceeds to increment — verified live with 15 concurrent requests
+producing `welcome_bonus_claims = 15` (and reproduced again after a reset,
+producing 8 from 8 concurrent requests). A single request, or requests
+sent one after another, always and only ever produces exactly one
+successful claim — verified live — since the check correctly observes the
+prior write once there's no concurrent window to race within.
 
-Per the explicit instruction to stop and report rather than silently work
-around a finding in this category, challenge 12 was left unimplemented.
-**This does not block challenges 11 or 13** — neither grants command
-execution or any outbound-request capability, so neither has a path to
-IMDS regardless of this finding.
+**Flag condition:** The flag is included only when
+`welcome_bonus_claims >= 2` — direct proof multiple increments landed for
+one account, which is only reachable via the race (never via any
+sequential-use path). Shown on the Rewards page, and directly in the
+response of whichever concurrent request(s) observed the already-≥2 state.
+No other route increments this column.
 
-**To unblock this challenge:** harden IMDS on the EC2 host (hop-limit 1,
-and/or confirm no IAM role will ever be attached to an instance running
-this platform), then implement a realistic diagnostic/lookup feature (a
-webhook-hostname or DNS-check tool was the intended design — customer
-portal, unauthenticated command building via `child_process.exec` with a
-user-supplied hostname concatenated into a shell command) in a later
-phase.
+**Reset/retry:** `POST /company/portal/rewards/reset-bonus` resets the
+*requesting account's own* `welcome_bonus_claims` to 0 and reverses the
+associated points, so a player (or a tester) can retry after an
+inconclusive attempt without a full platform reset. Deliberately **not**
+linked from the Rewards page UI or any other player-facing surface —
+verified live that no such link/reference exists in the rendered page —
+this is an operator/testing-documented convenience, not part of the
+intended solve path. Resetting your own state is not itself racy (no
+interesting outcome from concurrent resets — it only ever restores a clean
+starting point) and never increments the claim counter.
+
+**Isolation:** Pure application/database-layer logic — no shell execution,
+no filesystem access, no outbound network requests, nothing touching
+`infra-service`/`internal-api`/Docker/AWS metadata. Confined to a single
+`company_users` column update via the existing `company_app` Postgres
+role; no new tables, no grant changes, no changes to `docker-compose.yml`
+beyond the one additive `FLAG_RACE_CONDITION` environment variable.
+
+**Known limitations:** None beyond the deliberate scope of the challenge.
+Challenge 08's own `/rewards/redeem` route and its vulnerability are
+byte-for-byte unchanged by this work — the two challenges share only the
+Rewards page template, and confirmed via live regression testing that
+challenge 08 still works exactly as before.
 
 ---
 
@@ -604,3 +624,98 @@ The trailing `-- ` comments out the rest of the query (including the `email` che
 **Isolation:** Same Postgres instance/database as every other `instant-web` query, executed under the `company_app` role (see `docs/DATABASE.md`), which has no grants on any `platform_app`-owned table (`players`, `challenges`, `solves`, `submission_log`). A subquery pointed at any of those tables fails with a Postgres permission error, which this route's `catch` block folds into an indistinguishable "not found" response — so the boolean oracle simply doesn't work against platform tables at all; the database-level role boundary holds regardless of how the application-level query is shaped. No superuser, no cross-role grants were added or changed to build this challenge.
 
 **Known limitations:** None beyond the deliberate scope of the challenge. Full manual extraction of the flag is tedious by hand (as with any real blind-SQLi finding) — the challenge is intended to be solved with a short scripted extraction loop (e.g. `sqlmap --technique=B`, or a simple `curl` loop), which is realistic and expected for this difficulty tier.
+
+---
+
+## 14 — Server-Side Request Forgery
+
+- **Difficulty / Points:** Medium / 200
+- **Affected route:** `POST /company/portal/integrations/connectivity-test`
+- **Vulnerability type:** SSRF via a host/port-safe but path-unrestricted target allowlist.
+- **Source:** `services/instant-web/src/routes/portal.js`, `services/instant-web/src/views/portal/integrations.ejs`, `services/infra-service/src/index.js`
+
+**Intended discovery:** The customer portal's new **Integrations** page names all three of Instant's internal services (internal-api, template-service, infra-service) and offers a single "Test Connectivity" button. Viewing the page source (ordinary recon, no tooling required) reveals a hidden `target` field defaulting to `http://template-service:4002/health` alongside the button.
+
+**Intended exploitation:** The server checks that `target` **starts with** one of exactly three allowed origins (`http://internal-api:4001/`, `http://template-service:4002/`, `http://infra-service:4003/`) — a real, unbypassable host/port boundary (blocks AWS metadata, external hosts, everything else) — but never restricts the *path* after that prefix. Changing the hidden field's value to `http://infra-service:4003/status` (still passes the prefix check) returns that service's existing `/status` JSON, which now includes a `diagnostics_endpoint` field pointing at `/diagnostics/internal-report` — a route the admin Tools page never calls. Requesting `http://infra-service:4003/diagnostics/internal-report` returns the flag.
+
+**Flag location:** `infra-service`'s `/diagnostics/internal-report` route, `internal_notice` field.
+
+**Isolation:** The allowlist is a strict prefix match against exactly three hardcoded internal hostnames baked into `instant-web`'s own code (`config.internal.*Url`) — not derived from player input at all beyond the already-validated prefix, so there is no bypass path to `169.254.169.254`, any external domain, or the Docker host. `infra-service` itself makes no outbound requests and stays on the `internal` Docker network only (no published port, confirmed in `docker-compose.yml`), same as before this challenge existed.
+
+**Known limitations:** None beyond the deliberate scope of the challenge.
+
+---
+
+## 15 — Open Redirect
+
+- **Difficulty / Points:** Easy / 125
+- **Affected route:** `GET /company/out?url=`
+- **Vulnerability type:** Open redirect via a substring-based (not hostname-parsed) partner-domain allowlist.
+- **Source:** `services/instant-web/src/routes/public.js`, `services/instant-web/src/views/public/home.ejs`, `services/instant-web/src/views/public/leaving.ejs`
+
+**Intended discovery:** The homepage's new "Trusted by our partners" section links out through `/company/out?url=https://partners.instant.example/...` — a plain, visible link, no hidden mechanism.
+
+**Intended exploitation:** The validation check is `url.includes('partners.instant.example')` — a raw substring test on the entire URL string, not a parsed-hostname comparison. A URL like `http://attacker.example/?x=partners.instant.example` (the allowed domain appears only in the query string) or `http://partners.instant.example.attacker.example/` (the allowed domain appears only as a prefix of an attacker-controlled subdomain) both satisfy the substring check while pointing somewhere else entirely.
+
+**Flag location:** The "You're leaving Instant" interstitial performs its own correct hostname parse (`new URL(url).hostname`) after the substring check already passed. When that proper parse disagrees with the substring check — i.e. a genuine bypass, not a real partner link — the interstitial shows a "destination verification failed" notice containing the flag. Redirecting to an actually-allowed partner domain does not produce a flag.
+
+**Isolation:** No server-side fetch of any kind — the server only issues the *player's own browser* a link to follow, so this creates no new outbound network capability for any container.
+
+**Known limitations:** None beyond the deliberate scope of the challenge.
+
+---
+
+## 16 — CORS Misconfiguration
+
+- **Difficulty / Points:** Medium / 200
+- **Affected route:** `GET /company/portal/api/widget-summary`
+- **Vulnerability type:** Reflected `Access-Control-Allow-Origin` combined with `Access-Control-Allow-Credentials: true` on a cookie-authenticated endpoint.
+- **Source:** `services/instant-web/src/routes/portal.js`, `services/instant-web/src/views/portal/settings.ejs`
+
+**Intended discovery:** The Settings page documents this endpoint under "Developer: account widget" — session-cookie authenticated, explicitly distinct from challenge 07's bearer-token API (CORS credential theft is only meaningful against cookie auth, since a foreign page never has the player's bearer token to attach).
+
+**Intended exploitation:** The handler reflects whatever `Origin` header is present back into `Access-Control-Allow-Origin` and always sets `Access-Control-Allow-Credentials: true` — the textbook misconfiguration. A player builds a two-line local HTML file (no hosting needed — even a `file://` page's `Origin: null` gets reflected) running `fetch('.../widget-summary', {credentials:'include'})` while logged into Instant in the same browser; the browser attaches the session cookie and, because of the misconfigured headers, allows the foreign page's JS to read the response.
+
+**Flag location:** Included in the JSON response only when the request carries both a valid session cookie and an `Origin` header that doesn't match the app's own origin — real, live proof a foreign-origin credentialed request succeeded (no victim bot needed; the player's own browser making a request as itself, from a foreign origin, to its own logged-in session is the complete, honest demonstration).
+
+**Isolation:** The permissive headers are set on this one route only, not global CORS middleware — no other endpoint is affected. Data returned is the player's own synthetic account fields (name/email/loyalty points), never another player's data, never CTF-platform data, never a real secret.
+
+**Known limitations:** None beyond the deliberate scope of the challenge.
+
+---
+
+## 17 — Remote File Inclusion
+
+- **Difficulty / Points:** Hard / 275
+- **Affected route:** `GET /company/portal/settings/signature-preview?snippet=`
+- **Vulnerability type:** Remote File Inclusion — unescaped inclusion of a network-fetched, attacker-influenced remote resource from a sandboxed internal content host.
+- **Source:** `services/instant-web/src/routes/portal.js`, `services/instant-web/src/views/portal/signature_preview.ejs`, `services/infra-service/src/index.js`
+
+**Intended discovery:** Settings → "Support signature" links to a snippet preview page. Its `<select>` only offers three snippets in the UI, but the underlying request is a plain `GET ?snippet=`. The page's own copy explicitly names the sibling `internal/` folder on the content host ("engineering notes moved to `internal/` during a cleanup, not linked from here") — a direct, in-app breadcrumb, not a guess.
+
+**Intended exploitation:** `instant-web` fetches `http://infra-service:4003/assets?name=<snippet>` and embeds the response **unescaped** directly into the live preview pane (`<%- content %>`) — genuine inclusion, distinct from challenge 14's SSRF, which only ever displays raw fetched bytes as a status/report, never renders them as part of the page. The vulnerable file-resolution logic lives on `infra-service` itself: `path.resolve(ASSETS_DIR, name)` with no containment check (the same bug shape as challenge 11's LFI, just reached over the network instead of via a local read). Requesting `?snippet=../internal/flag` resolves outside `assets/` into the sibling `internal/` directory named on the settings page.
+
+**Flag location:** `infra-service`'s `content/internal/flag.txt`, fetched by `instant-web` and rendered verbatim into the preview.
+
+**Isolation:** `instant-web` never supplies a host for this fetch — the target (`config.internal.infraServiceUrl`) is hardcoded, never player-influenced; only the logical snippet *name* is, and only against `infra-service`'s own container filesystem (no host bind mount anywhere in this project). A mandatory `.txt` suffix (appended whenever the caller's input doesn't already end in `.txt`) plus a small denylist (`/proc/`, `/etc/shadow`, `.ssh/`, `docker.sock`) bound the reachable target set the same way challenge 11 is bounded — `infra-service` also makes no outbound requests of its own, so there is no path to AWS metadata regardless. This is not template injection/SSTI: the player selects among plain text files, never supplies template syntax, and no rendering engine evaluates the fetched content as code anywhere in this path.
+
+**Known limitations:** None beyond the deliberate scope of the challenge.
+
+---
+
+## 18 — Chained Web Attack
+
+- **Difficulty / Points:** Advanced / 400
+- **Affected routes:** `GET /company/portal/invoices/:id` (challenge 06, reused unmodified) → `GET /company/api/internal/ops-console` (new)
+- **Vulnerability type:** Chains challenge 06 (IDOR) and challenge 07 (JWT `alg:none` forgery) — no new vulnerability class.
+- **Source:** `services/instant-web/src/routes/api.js`, `services/instant-web/src/seed.js` (`seedOpsIntegrationInvoice`)
+
+**Intended discovery:** The API reference table on the API Tokens page (see challenge 07) lists `GET /company/api/internal/ops-console`, noted as requiring "an authorized ops-integration service account" — a fair hint that scope alone (sufficient for challenge 07's `/internal/diagnostics`) won't be enough here, without revealing why. Separately, a player enumerating small invoice ids for challenge 06 will run across one more than expected: a synthetic "Ops Integration" account's invoice, whose memo reads "Ops integration account - service ID `<n>` - reserved for automated admin:internal diagnostics only."
+
+**Intended exploitation:** Step one is challenge 06's IDOR, verbatim — no code changes to that route — which reveals the ops-integration account's numeric id. Step two reuses challenge 07's exact `alg:none` forgery technique, but `/ops-console` additionally requires `sub` (the forged token's subject claim) to equal that specific id — a token forged with the player's own id and elevated scope (which is all challenge 07 needs) is insufficient here.
+
+**Flag location:** `internal_notice` field of the `/ops-console` response, returned only when both the scope and `sub` checks pass.
+
+**Isolation:** No new attack surface: reuses `company_app`'s existing, unchanged access to the `company_users`/`orders`/`invoices` tables (same role, same grants as challenge 06) and the exact same `verifyApiToken` code path as challenge 07 (no changes to that function). One new `company_users` row (role `customer`, random unpublished password — same "no reachable login" pattern as challenge 04's VIP account and challenge 06's IDOR target) and one new invoice; no new tables, no grant changes.
+
+**Known limitations:** None beyond the deliberate scope of the challenge.

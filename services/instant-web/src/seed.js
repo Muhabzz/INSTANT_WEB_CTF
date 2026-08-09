@@ -91,6 +91,21 @@ async function seedCompanyUsers(client) {
     null
   );
 
+  // Challenge 18 (Chained Attack) target account: a synthetic
+  // "ops-integration" service account. Its own numeric id is the second
+  // piece a player needs (alongside challenge 07's alg:none forgery
+  // technique) to reach GET /company/api/internal/ops-console - see
+  // routes/api.js. No publicly known password, same as the challenge 04/06
+  // targets above.
+  const opsIntegrationHash = await bcrypt.hash(require('crypto').randomBytes(24).toString('hex'), 12);
+  const opsIntegrationId = await upsert(
+    'Ops Integration',
+    'ops-integration@instant.example',
+    opsIntegrationHash,
+    'customer',
+    null
+  );
+
   // Seed the demo customer with a starting loyalty point balance for
   // challenge 08 (Business Logic). Ordinary, not itself sensitive.
   await client.query(
@@ -99,7 +114,7 @@ async function seedCompanyUsers(client) {
   );
 
   console.log('[seed] ensured customer/employee/admin company accounts exist');
-  return { customerId, employeeId, adminId, idorTargetId };
+  return { customerId, employeeId, adminId, idorTargetId, opsIntegrationId };
 }
 
 async function seedProducts(client) {
@@ -196,6 +211,38 @@ async function seedIdorTargetInvoice(client, idorTargetId) {
   console.log('[seed] created IDOR-target invoice');
 }
 
+async function seedOpsIntegrationInvoice(client, opsIntegrationId) {
+  // Challenge 18 (Chained Attack), step one: reachable via the exact same
+  // IDOR as challenge 06 (routes/portal.js GET /invoices/:id has no
+  // ownership check) - a player who is already enumerating small invoice
+  // ids for challenge 06 will run across this one too. Its memo reveals
+  // the numeric account id needed for step two.
+  const { rows: existing } = await client.query(
+    'SELECT o.id FROM orders o WHERE o.customer_id = $1 LIMIT 1',
+    [opsIntegrationId]
+  );
+  if (existing.length > 0) return;
+
+  const { rows: orderRows } = await client.query(
+    `INSERT INTO orders (customer_id, status, total_cents) VALUES ($1,'paid',0) RETURNING id`,
+    [opsIntegrationId]
+  );
+  const orderId = orderRows[0].id;
+
+  await client.query(
+    `INSERT INTO invoices (order_id, invoice_number, amount_cents, status, internal_memo)
+     VALUES ($1,$2,0,'paid',$3)
+     ON CONFLICT (invoice_number) DO NOTHING`,
+    [
+      orderId,
+      `INV-2026-${String(orderId).padStart(4, '0')}`,
+      `Ops integration account - service ID ${opsIntegrationId} - reserved for ` +
+        'automated admin:internal diagnostics only. Do not use for customer billing.',
+    ]
+  );
+  console.log('[seed] created ops-integration invoice');
+}
+
 async function seedSupportEscalations(client) {
   const { rows: existing } = await client.query('SELECT COUNT(*)::int AS n FROM support_escalations');
   if (existing[0].n > 0) return;
@@ -274,7 +321,7 @@ async function seed() {
   await runMigrations();
   const client = await pool.connect();
   try {
-    const { customerId, employeeId, idorTargetId } = await seedCompanyUsers(client);
+    const { customerId, employeeId, idorTargetId, opsIntegrationId } = await seedCompanyUsers(client);
     await seedProducts(client);
     await seedBlogPosts(client);
     await seedOrdersAndInvoices(client, customerId);
@@ -283,6 +330,7 @@ async function seed() {
     await seedInternalNotes(client);
     await seedIdorTargetInvoice(client, idorTargetId);
     await seedSupportEscalations(client);
+    await seedOpsIntegrationInvoice(client, opsIntegrationId);
   } finally {
     client.release();
   }

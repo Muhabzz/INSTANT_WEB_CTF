@@ -1,0 +1,18 @@
+<%- include('../partials/header', { title, navItems, brandSuffix }) %>
+
+<h1 class="mt-0">You're leaving Instant</h1>
+<div class="card" style="max-width:480px">
+  <p class="muted">You're being redirected to a partner site:</p>
+  <p style="word-break:break-all"><code><%= destination %></code></p>
+  <a class="btn" href="<%= destination %>">Continue</a>
+
+  <% if (bypassNotice) { %>
+    <div class="alert error" style="margin-top:1rem">
+      <strong>Destination verification failed:</strong> this link's destination
+      does not actually match any of our verified partner domains, even
+      though it passed our redirect check. Reference: <%= bypassNotice %>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

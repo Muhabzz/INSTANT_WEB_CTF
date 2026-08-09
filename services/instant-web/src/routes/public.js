@@ -141,6 +141,45 @@ router.get('/support', (req, res) => {
   res.render('public/support', { title: 'Support' });
 });
 
+// Challenge 15 (Open Redirect). Outbound-link click tracker, the kind many
+// marketing sites use for partner links. Intended rule: only ever redirect
+// to Instant's known partner domains.
+const PARTNER_ALLOWLIST = ['partners.instant.example'];
+
+router.get('/out', (req, res) => {
+  const url = (req.query.url || '').toString();
+  if (!url) {
+    return res.status(400).render('public/error', { title: 'Invalid Request', message: 'Missing url parameter.' });
+  }
+
+  // BUG: raw substring test on the whole URL string, not a parsed-hostname
+  // comparison - a URL that merely CONTAINS the allowed domain as a
+  // substring anywhere (query string, path, or as a prefix of an
+  // attacker-controlled subdomain) passes this check.
+  const passesSubstringCheck = PARTNER_ALLOWLIST.some((domain) => url.includes(domain));
+  if (!passesSubstringCheck) {
+    return res.status(400).render('public/error', { title: 'Invalid Request', message: 'That destination is not recognized.' });
+  }
+
+  // A real hostname parse, run only to distinguish a genuine partner
+  // domain from a bypass for the notice below - it never blocks anything
+  // itself (the redirect already happened by the time this app would want
+  // to "notice" a bypass, same as it would in a real incident).
+  let genuinePartnerMatch = false;
+  try {
+    const hostname = new URL(url).hostname;
+    genuinePartnerMatch = PARTNER_ALLOWLIST.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+  } catch (err) {
+    genuinePartnerMatch = false;
+  }
+
+  res.render('public/leaving', {
+    title: 'Leaving Instant',
+    destination: url,
+    bypassNotice: genuinePartnerMatch ? null : config.flags.openRedirect,
+  });
+});
+
 router.get('/track-order', (req, res) => {
   res.render('public/track_order', { title: 'Track Your Order', submitted: false, found: null, orderId: '', email: '' });
 });

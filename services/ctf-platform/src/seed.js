@@ -8,36 +8,36 @@ function hashFlag(flag) {
   return crypto.createHash('sha256').update(flag, 'utf8').digest('hex');
 }
 
-// Phase 2/3/4: challenges 01-11 and 13 are real, enabled, and live inside
-// the Instant company application (services/instant-web). See
+// Phase 2-6: challenges 01-18 are all real, enabled, and live inside the
+// Instant company application (services/instant-web), plus small
+// additions to infra-service for challenges 14 and 17. See
 // docs/CHALLENGES.md for the intended discovery/exploitation path for each
 // one (admin-only doc - player-facing text below is deliberately
 // non-spoiling beyond the title, same as any real CTF's challenge catalog).
 //
-// Challenge 12 (Command Injection) was deliberately NOT implemented in
-// Phase 4 - a pre-deployment check found AWS instance metadata (IMDS)
-// reachable from inside containers on this host (no IAM role currently
-// attached, but the hop-limit hardening that would block container access
-// isn't set). Granting real command execution inside instant-web would
-// have a live path to that exposure. See docs/CHALLENGES.md
-// "12 - Command Injection (deferred)". Its placeholder row (order_index
-// 12) is retained below, disabled, until this is resolved at the
-// AWS/infrastructure level (outside this repo) and the challenge is built
-// in a later phase.
-//
-// The remaining rows (14-18) are placeholders reserving slug/category/
-// points for later phases. Disabled, hidden from players.
+// Challenge 12 was originally reserved for Command Injection, which was
+// never implemented - a pre-deployment check found AWS instance metadata
+// (IMDS) reachable from inside containers on this host, and granting real
+// command execution would have had a live path to that exposure (an
+// EC2/AWS-side issue, not fixable in this repo). Per instruction, this
+// slot was replaced outright with a Race Condition challenge instead (see
+// docs/CHALLENGES.md "12 - Race Condition") rather than implementing
+// command execution.
 //
 // NOTE: Phase 1 seeded a different slug set (getting-started,
 // public-product-catalog, customer-auth, etc), Phase 2 seeded placeholder
 // slugs for 06-10 (public-blog-metadata, customer-order-access,
 // customer-invoice-handling, employee-auth, employee-directory) that
-// Phase 3 replaced, and Phase 4 replaces the 11/13 placeholders
-// (employee-documents, employee-analytics) with the actual challenge
-// definitions below (different vulnerability classes than originally
-// placeholder-planned). Upgrading an existing deployment should use
-// `scripts/reset.sh`, not just `scripts/seed.sh` - re-seeding alone leaves
-// old rows in place as orphaned, still-disabled challenges since their
+// Phase 3 replaced, Phase 4 replaced the 11/13 placeholders
+// (employee-documents, employee-analytics), Phase 5 replaced the 14-18
+// placeholders (company-admin-access, company-admin-users,
+// internal-api-exposure, template-service-rendering,
+// full-chain-compromise), and this revision replaces the 12 placeholder
+// (employee-file-upload) with the actual challenge definition below
+// (different vulnerability classes than originally placeholder-planned).
+// Upgrading an existing deployment should use `scripts/reset.sh`, not just
+// `scripts/seed.sh` - re-seeding alone leaves old rows in place as
+// orphaned, still-disabled challenges since their
 // slugs no longer appear in this list.
 const CHALLENGES = [
   {
@@ -184,10 +184,20 @@ const CHALLENGES = [
     enabled: true,
     order_index: 11,
   },
-  // Challenge 12 (Command Injection) is deferred, not implemented this
-  // phase - see docs/CHALLENGES.md "12 - Command Injection (deferred)".
-  // Reserved placeholder retained below, disabled, no real flag value.
-  { slug: 'employee-file-upload', title: 'File Upload Handling', category: 'Employee Portal', difficulty: 'hard', points: 200, order_index: 12 },
+  {
+    slug: 'race-condition-bonus-claim',
+    title: 'Race Condition',
+    description:
+      'New accounts can claim a one-time welcome bonus on the Rewards ' +
+      "page. \"One-time\" is a business rule, not something the server " +
+      'actually enforces atomically.',
+    category: 'Customer Portal',
+    difficulty: 'medium',
+    points: 200,
+    flag: config.flags.raceCondition,
+    enabled: true,
+    order_index: 12,
+  },
   {
     slug: 'advanced-sql-injection',
     title: 'Advanced SQL Injection',
@@ -201,11 +211,73 @@ const CHALLENGES = [
     enabled: true,
     order_index: 13,
   },
-  { slug: 'company-admin-access', title: 'Company Admin Access Control', category: 'Company Admin', difficulty: 'hard', points: 225, order_index: 14 },
-  { slug: 'company-admin-users', title: 'Admin User Management', category: 'Company Admin', difficulty: 'hard', points: 225, order_index: 15 },
-  { slug: 'internal-api-exposure', title: 'Internal API Exposure', category: 'Internal Services', difficulty: 'hard', points: 250, order_index: 16 },
-  { slug: 'template-service-rendering', title: 'Template Rendering', category: 'Internal Services', difficulty: 'advanced', points: 275, order_index: 17 },
-  { slug: 'full-chain-compromise', title: 'Full Chain: Company Compromise', category: 'Attack Chain', difficulty: 'advanced', points: 400, order_index: 18 },
+  {
+    slug: 'ssrf',
+    title: 'Server-Side Request Forgery',
+    description:
+      'The Integrations page can check whether one of our internal services ' +
+      "is reachable. See exactly what it's checking, and how.",
+    category: 'Customer Portal',
+    difficulty: 'medium',
+    points: 200,
+    flag: config.flags.ssrf,
+    enabled: true,
+    order_index: 14,
+  },
+  {
+    slug: 'open-redirect',
+    title: 'Open Redirect',
+    description:
+      "Instant's partner links go through a redirect helper on their way " +
+      'out. Take a look at what it actually checks before sending you there.',
+    category: 'Public Website',
+    difficulty: 'easy',
+    points: 125,
+    flag: config.flags.openRedirect,
+    enabled: true,
+    order_index: 15,
+  },
+  {
+    slug: 'cors-misconfiguration',
+    title: 'CORS Misconfiguration',
+    description:
+      'A small widget API lets you embed your account summary elsewhere. ' +
+      'Check which origins it actually trusts.',
+    category: 'Customer Portal',
+    difficulty: 'medium',
+    points: 200,
+    flag: config.flags.cors,
+    enabled: true,
+    order_index: 16,
+  },
+  {
+    slug: 'remote-file-inclusion',
+    title: 'Remote File Inclusion',
+    description:
+      'Support ticket signatures are pulled from a small internal snippet ' +
+      "library. The picker only shows three options - that doesn't mean " +
+      'only three exist.',
+    category: 'Customer Portal',
+    difficulty: 'hard',
+    points: 275,
+    flag: config.flags.rfi,
+    enabled: true,
+    order_index: 17,
+  },
+  {
+    slug: 'chained-attack',
+    title: 'Chained Web Attack',
+    description:
+      'Some accounts on Instant are not meant for customer login at all. ' +
+      "Finding one is only half the problem - the other half is something " +
+      "you've already solved elsewhere.",
+    category: 'Attack Chain',
+    difficulty: 'advanced',
+    points: 400,
+    flag: config.flags.chainedAttack,
+    enabled: true,
+    order_index: 18,
+  },
 ];
 
 async function seedChallenges(client) {

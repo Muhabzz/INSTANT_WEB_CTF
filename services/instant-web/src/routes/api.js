@@ -94,4 +94,36 @@ router.get('/internal/diagnostics', verifyApiToken, (req, res) => {
   });
 });
 
+// Challenge 18 (Chained Attack). Reuses the exact same alg:none forgery
+// technique as challenge 07's /internal/diagnostics above, but scope alone
+// isn't enough here - `sub` must also match the ops-integration service
+// account's own id, which is never given directly. It's only reachable via
+// challenge 06's IDOR (GET /invoices/:id, no ownership check) against that
+// account's seeded invoice - two distinct, already-taught weaknesses
+// chained together, not a new vulnerability class.
+router.get('/internal/ops-console', verifyApiToken, async (req, res, next) => {
+  if (req.apiAuth.scope !== 'admin:internal') {
+    logger.warn('api_ops_console_denied', { sub: req.apiAuth.sub, reason: 'scope' });
+    return res.status(403).json({ error: 'Insufficient scope.' });
+  }
+  try {
+    const { rows } = await query(
+      `SELECT id FROM company_users WHERE email = 'ops-integration@instant.example' AND role = 'customer'`
+    );
+    const opsIntegrationId = rows[0] && rows[0].id;
+    if (!opsIntegrationId || Number(req.apiAuth.sub) !== opsIntegrationId) {
+      logger.warn('api_ops_console_denied', { sub: req.apiAuth.sub, reason: 'sub' });
+      return res.status(403).json({ error: 'This scope is only valid for the ops-integration service account.' });
+    }
+    logger.warn('api_ops_console_accessed', { sub: req.apiAuth.sub });
+    res.json({
+      service: 'ops-console',
+      status: 'ok',
+      internal_notice: `Ops console access confirmed for the ops-integration service account. Tracking ref: ${config.flags.chainedAttack}`,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

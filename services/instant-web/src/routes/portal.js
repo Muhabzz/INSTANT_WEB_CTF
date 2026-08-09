@@ -39,6 +39,7 @@ const NAV_AUTH = [
   { href: '/company/portal/support', label: 'Support' },
   { href: '/company/portal/rewards', label: 'Rewards' },
   { href: '/company/portal/api-tokens', label: 'API Tokens' },
+  { href: '/company/portal/integrations', label: 'Integrations' },
   { href: '/company/portal/settings', label: 'Settings' },
 ];
 
@@ -479,12 +480,16 @@ router.get('/settings/quick-unsubscribe', customerAuth.requireAuth, async (req, 
 const LOYALTY_TIER_THRESHOLD = 100000;
 
 router.get('/rewards', customerAuth.requireAuth, (req, res) => {
+  const bonusClaims = req.companyUser.welcome_bonus_claims || 0;
   res.render('portal/rewards', {
     title: 'Rewards',
     balance: req.companyUser.loyalty_points,
     unlocked: req.companyUser.loyalty_points >= LOYALTY_TIER_THRESHOLD,
     flag: req.companyUser.loyalty_points >= LOYALTY_TIER_THRESHOLD ? config.flags.businessLogic : null,
     formError: null,
+    bonusClaims,
+    bonusError: null,
+    raceFlag: bonusClaims >= 2 ? config.flags.raceCondition : null,
   });
 });
 
@@ -514,6 +519,100 @@ router.post('/rewards/redeem', customerAuth.requireAuth, verifyCsrfToken, async 
     ]);
     logger.info('loyalty_points_redeemed', { userId: req.companyUser.id, points });
     res.redirect('/company/portal/rewards');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Challenge 12 (Race Condition). One-time signup bonus - the intended
+// business rule is "claimable exactly once per account" (0 or 1). The
+// check (read the current claim count) and the act (increment it) are two
+// separate round-trips with no transaction, no row lock
+// (`SELECT ... FOR UPDATE`), and no atomic compare-and-swap
+// (`UPDATE ... SET welcome_bonus_claims = welcome_bonus_claims + 1 WHERE
+// welcome_bonus_claims = 0`). The ~400ms delay between the check and the
+// write is framed as a fraud-check lookup - a realistic reason a claim
+// endpoint would pause - and exists to widen the window enough to
+// reliably demonstrate this with ordinary concurrent tooling (a handful
+// of parallel requests) instead of requiring sub-millisecond timing. The
+// race itself is real: genuinely concurrent HTTP requests each run their
+// own SELECT against the same pre-write value during that window: this is
+// not a "repeat the request and pretend" shortcut - a single request, or
+// requests sent one after another, always resolves to exactly one
+// successful claim (see the accepted-values check below).
+router.post('/rewards/claim-bonus', customerAuth.requireAuth, verifyCsrfToken, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      'SELECT welcome_bonus_claims FROM company_users WHERE id = $1',
+      [req.companyUser.id]
+    );
+    const alreadyClaimed = rows[0].welcome_bonus_claims > 0;
+
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    let claims = rows[0].welcome_bonus_claims;
+    let balance = req.companyUser.loyalty_points;
+    let bonusError = null;
+
+    if (alreadyClaimed) {
+      bonusError = 'You have already claimed your welcome bonus.';
+    } else {
+      const { rows: updated } = await query(
+        `UPDATE company_users
+         SET loyalty_points = loyalty_points + 500,
+             welcome_bonus_claims = welcome_bonus_claims + 1
+         WHERE id = $1
+         RETURNING loyalty_points, welcome_bonus_claims`,
+        [req.companyUser.id]
+      );
+      claims = updated[0].welcome_bonus_claims;
+      balance = updated[0].loyalty_points;
+      logger.info('welcome_bonus_claimed', { userId: req.companyUser.id, claims });
+    }
+
+    res.render('portal/rewards', {
+      title: 'Rewards',
+      balance,
+      unlocked: balance >= LOYALTY_TIER_THRESHOLD,
+      flag: balance >= LOYALTY_TIER_THRESHOLD ? config.flags.businessLogic : null,
+      formError: null,
+      bonusClaims: claims,
+      bonusError,
+      raceFlag: claims >= 2 ? config.flags.raceCondition : null,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Challenge 12 (Race Condition) reset/retry mechanism. Deliberately not
+// linked from the Rewards page UI (see docs/CHALLENGES.md) - resets only
+// the requesting account's own bonus-claim state, so a player whose
+// concurrent attempt didn't land cleanly can retry without a full
+// platform reset. Resetting your own state is not itself racy (there is
+// no interesting outcome from concurrent resets - it only ever restores a
+// clean starting point) and never increments welcome_bonus_claims.
+router.post('/rewards/reset-bonus', customerAuth.requireAuth, verifyCsrfToken, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `UPDATE company_users
+       SET loyalty_points = GREATEST(loyalty_points - (500 * welcome_bonus_claims), 0),
+           welcome_bonus_claims = 0
+       WHERE id = $1
+       RETURNING loyalty_points, welcome_bonus_claims`,
+      [req.companyUser.id]
+    );
+    logger.info('welcome_bonus_reset', { userId: req.companyUser.id });
+    res.render('portal/rewards', {
+      title: 'Rewards',
+      balance: rows[0].loyalty_points,
+      unlocked: rows[0].loyalty_points >= LOYALTY_TIER_THRESHOLD,
+      flag: rows[0].loyalty_points >= LOYALTY_TIER_THRESHOLD ? config.flags.businessLogic : null,
+      formError: null,
+      bonusClaims: rows[0].welcome_bonus_claims,
+      bonusError: null,
+      raceFlag: null,
+    });
   } catch (err) {
     next(err);
   }
@@ -621,6 +720,116 @@ router.get('/uploads/:filename', customerAuth.requireAuth, (req, res) => {
       res.status(404).render('error', { title: 'Not Found', message: 'File not found.' });
     }
   });
+});
+
+// Challenge 14 (SSRF). "Test Integration Connectivity" - intended to be a
+// single fixed check (confirm Instant's own template-rendering service is
+// reachable), so the visible UI only ever shows one button. The actual
+// implementation reads the fetch target from a hidden form field instead
+// of hardcoding it server-side, and only validates the target's host:port
+// against an allowlist prefix - real, unbypassable for host/port (blocks
+// AWS metadata, external hosts, everything but these three containers),
+// but it says nothing about which *path* on an allowed host is acceptable.
+const SSRF_ALLOWED_PREFIXES = [
+  `${config.internal.internalApiUrl}/`,
+  `${config.internal.templateServiceUrl}/`,
+  `${config.internal.infraServiceUrl}/`,
+];
+
+router.get('/integrations', customerAuth.requireAuth, (req, res) => {
+  res.render('portal/integrations', { title: 'Integrations', result: null, target: null });
+});
+
+router.post('/integrations/connectivity-test', customerAuth.requireAuth, verifyCsrfToken, async (req, res, next) => {
+  const target = (req.body.target || `${config.internal.templateServiceUrl}/health`).toString();
+
+  if (!SSRF_ALLOWED_PREFIXES.some((prefix) => target.startsWith(prefix))) {
+    return res.status(400).render('portal/integrations', {
+      title: 'Integrations',
+      target,
+      result: { ok: false, body: 'Target must be one of Instant\'s internal services.' },
+    });
+  }
+
+  try {
+    const r = await fetch(target, { signal: AbortSignal.timeout(3000) });
+    const body = await r.text();
+    logger.info('integration_connectivity_test', { userId: req.companyUser.id, target, status: r.status });
+    res.render('portal/integrations', { title: 'Integrations', target, result: { ok: true, body } });
+  } catch (err) {
+    res.render('portal/integrations', {
+      title: 'Integrations',
+      target,
+      result: { ok: false, body: `Request failed: ${err.message}` },
+    });
+  }
+});
+
+// Challenge 16 (CORS Misconfiguration). Session-cookie authenticated (not
+// bearer-token, unlike challenge 07's API - CORS credential theft is only
+// meaningful against cookie auth, since a foreign page never has the
+// player's bearer token to attach itself). Reflects any Origin instead of
+// checking it against an allowlist, and allows credentials - the classic
+// combination that lets a foreign page's JS read this response in a
+// victim's own browser, using the victim's own session cookie.
+router.get('/api/widget-summary', customerAuth.requireAuth, (req, res) => {
+  const origin = req.headers.origin;
+  const ownOrigin = `${req.protocol}://${req.headers.host}`;
+
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+
+  const body = {
+    name: req.companyUser.name,
+    email: req.companyUser.email,
+    loyalty_points: req.companyUser.loyalty_points,
+  };
+
+  // Only a genuine cross-origin request (foreign Origin header) proves the
+  // browser's CORS check actually let a foreign page read this - a normal
+  // same-origin page load never sends a mismatched Origin.
+  if (origin && origin !== ownOrigin) {
+    logger.warn('widget_summary_cross_origin_access', { userId: req.companyUser.id, origin });
+    body.security_notice = `Cross-origin credentialed request detected from ${origin}. Reference: ${config.flags.cors}`;
+  }
+
+  res.json(body);
+});
+
+// Challenge 17 (RFI). "Support Signature" preview - fetches a named
+// snippet from infra-service (a separate container, reached over the
+// `internal` Docker network - the "remote" in remote file inclusion) and
+// embeds the fetched bytes DIRECTLY into the rendered preview, unescaped
+// (see views/portal/integrations.ejs's sibling view
+// portal/signature_preview usage below) - genuine inclusion, not just a
+// raw text/JSON display. The actual vulnerable file-resolution logic (no
+// containment check, bounded only by a mandatory .txt suffix) lives on
+// infra-service itself - see services/infra-service/src/index.js - this
+// route only ever talks to the hardcoded infra-service host, never a
+// player-influenced one, so there is no SSRF-style host confusion here,
+// only which file gets included from that one fixed, sandboxed host.
+const SIGNATURE_SNIPPETS = ['default', 'formal', 'minimal'];
+
+router.get('/settings/signature-preview', customerAuth.requireAuth, async (req, res, next) => {
+  const snippet = (req.query.snippet || 'default').toString();
+  try {
+    const r = await fetch(
+      `${config.internal.infraServiceUrl}/assets?name=${encodeURIComponent(snippet)}`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    const content = await r.text();
+    res.render('portal/signature_preview', {
+      title: 'Signature Preview',
+      snippet,
+      snippets: SIGNATURE_SNIPPETS,
+      content: r.ok ? content : null,
+      error: r.ok ? null : 'That snippet could not be loaded.',
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

@@ -1,0 +1,31 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Support Signature</h1>
+<div class="card" style="max-width:640px">
+  <p class="muted">
+    Choose a signature snippet to include at the bottom of your support
+    tickets. Snippets are served from Instant's internal content library
+    (the <code>assets/</code> folder on that host) - unrelated internal
+    folders on the same host, like engineering notes moved to
+    <code>internal/</code> during a cleanup, are not linked from here.
+  </p>
+
+  <form class="stacked" method="GET" action="/company/portal/settings/signature-preview">
+    <label for="snippet">Snippet</label>
+    <select id="snippet" name="snippet" onchange="this.form.submit()">
+      <% snippets.forEach(s => { %>
+        <option value="<%= s %>" <%= s === snippet ? 'selected' : '' %>><%= s.charAt(0).toUpperCase() + s.slice(1) %></option>
+      <% }) %>
+    </select>
+    <noscript><button class="btn" type="submit">Preview</button></noscript>
+  </form>
+
+  <h2>Preview</h2>
+  <% if (error) { %>
+    <div class="alert error"><%= error %></div>
+  <% } else { %>
+    <div class="card" style="background:#fafafa"><%- content %></div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

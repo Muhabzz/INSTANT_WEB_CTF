@@ -1,0 +1,23 @@
+<%- include('../partials/header', { title, navItems, brandSuffix, sessionUserLabel, logoutAction, csrfToken }) %>
+
+<h1 class="mt-0">Integrations</h1>
+<div class="card" style="max-width:640px">
+  <p class="muted">
+    Instant's platform is built on a small set of internal services
+    (internal-api, template-service, infra-service). Use the button below to
+    confirm our template-rendering service is reachable from your account's
+    region.
+  </p>
+
+  <form method="POST" action="/company/portal/integrations/connectivity-test">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="target" value="<%= target || 'http://template-service:4002/health' %>">
+    <button class="btn" type="submit">Test Connectivity</button>
+  </form>
+
+  <% if (result) { %>
+    <div class="alert <%= result.ok ? 'success' : 'error' %>" style="margin-top:1rem; word-break:break-all; white-space:pre-wrap"><%= result.body %></div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>
